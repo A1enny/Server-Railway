@@ -14,8 +14,6 @@ const usersRouter = require('./routes/usersRoutes');
 
 const app = express(); // ต้องสร้าง Express ก่อนใช้ `app.use()`
 
-const cors = require('cors');
-
 app.use(cors({
     origin: '*', 
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
