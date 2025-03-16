@@ -5,14 +5,14 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const cors = require('cors');
-const http = require('http'); // 👈 เพิ่ม http module
-const socketIo = require('socket.io'); // 👈 เพิ่ม socket.io
+const http = require('http'); // 👈 เพิ่ม module http
+const socketIo = require('socket.io'); // 👈 เพิ่ม module socket.io
 
 // ใช้ MySQL แทน MongoDB
 require('./config/db');
 
 const app = express();
-const server = http.createServer(app); // 👈 กำหนด server HTTP
+const server = http.createServer(app); // 👈 สร้าง HTTP Server
 const io = socketIo(server, {
     cors: {
         origin: '*',
@@ -21,7 +21,7 @@ const io = socketIo(server, {
     }
 });
 
-// 👇 ตอนนี้ `io` ถูกกำหนดแล้ว จึงสามารถใช้ใน Routes ได้
+// 📌 ตอนนี้กำหนด `io` ก่อนใช้ใน `routes`
 const orderRoutes = require("./routes/orderRoutes")(io);
 const menuRoutes = require("./routes/menuRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
@@ -34,7 +34,7 @@ const inventoryRoutes = require("./routes/inventoryRoutes");
 const unitRoutes = require("./routes/unitRoutes");
 const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
 const tableRoutes = require("./routes/tableRoutes")(io);
-const materialsRoutes = require('./routes/ingredientRoutes')(io); // ✅ ตอนนี้ io ถูกกำหนดก่อนเรียกใช้
+const materialsRoutes = require('./routes/ingredientRoutes')(io); // ✅ io ถูกกำหนดแล้ว
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/usersRoutes');
 
@@ -88,12 +88,6 @@ app.use(function(err, req, res, next) {
 
     res.status(err.status || 500);
     res.render('error');
-});
-
-// Start Server
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
 });
 
 module.exports = { app, io };
