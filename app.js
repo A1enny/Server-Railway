@@ -9,7 +9,19 @@ const cors = require('cors');
 // ใช้ MySQL แทน MongoDB
 require('./config/db');
 
-const products = require('./routes/products');
+const orderRoutes = require("./routes/orderRoutes");
+const menuRoutes = require("./routes/menuRoutes");
+const categoryRoutes = require("./routes/categoryRoutes");
+const saleRoutes = require("./routes/saleRoutes");
+const recipeRoutes = require("./routes/recipeRoutes");
+const reportRoutes = require("./routes/reportRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes");
+const unitRoutes = require("./routes/unitRoutes");
+const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
+const tableRoutes = require("./routes/tableRoutes");
+const materialsRoutes = require('./routes/ingredientRoutes')(io);
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/usersRoutes');
 
