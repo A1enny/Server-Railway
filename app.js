@@ -5,14 +5,14 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const cors = require('cors');
-const http = require('http'); // 👈 เพิ่ม module http
-const socketIo = require('socket.io'); // 👈 เพิ่ม module socket.io
+const http = require('http'); // ใช้ HTTP Server
+const socketIo = require('socket.io'); // ใช้ Socket.io
 
 // ใช้ MySQL แทน MongoDB
 require('./config/db');
 
 const app = express();
-const server = http.createServer(app); // 👈 สร้าง HTTP Server
+const server = http.createServer(app); // สร้าง HTTP Server
 const io = socketIo(server, {
     cors: {
         origin: '*',
@@ -21,8 +21,10 @@ const io = socketIo(server, {
     }
 });
 
-// 📌 ตอนนี้กำหนด `io` ก่อนใช้ใน `routes`
+// 📌 ใช้ `io` ใน routes ที่ต้องใช้
 const orderRoutes = require("./routes/orderRoutes")(io);
+const tableRoutes = require("./routes/tableRoutes")(io);
+const materialsRoutes = require("./routes/ingredientRoutes")(io);
 const menuRoutes = require("./routes/menuRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const saleRoutes = require("./routes/saleRoutes");
@@ -33,8 +35,6 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const unitRoutes = require("./routes/unitRoutes");
 const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
-const tableRoutes = require("./routes/tableRoutes")(io);
-const materialsRoutes = require("./routes/ingredientRoutes")(io);
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/usersRoutes');
 
@@ -90,4 +90,5 @@ app.use(function(err, req, res, next) {
     res.render('error');
 });
 
-module.exports = { app, io };
+// 📌 แก้ไขการ Export ให้รองรับการทำงานกับ bin/www
+module.exports = { app, server, io };
