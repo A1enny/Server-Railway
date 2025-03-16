@@ -50,6 +50,7 @@ app.use(function(err, req, res, next) {
 
 // Start Server (ถ้ายังไม่มีไฟล์ `bin/www`)
 const PORT = process.env.PORT || 3000;
+console.log(`✅ Using PORT: ${PORT}`);
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
