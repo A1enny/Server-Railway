@@ -4,8 +4,9 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
-const mongoose = require('mongoose');
 const cors = require('cors');
+
+const connectDB = require('./config/db'); // ✅ ต้อง import แบบนี้
 
 const products = require('./routes/products');
 const indexRouter = require('./routes/index');
@@ -15,14 +16,8 @@ const app = express(); // ต้องสร้าง Express ก่อนใช
 
 app.use(cors({ origin: '*' })); // แก้ไขให้ CORS ใช้งานได้ถูกต้อง
 
-// MongoDB Connection
-const uri = process.env.MONGO_URI;
-mongoose.connect(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-})
-    .then(() => console.log('✅ MongoDB Connected Successfully!'))
-    .catch((err) => console.error('❌ MongoDB Connection Error:', err));
+// เชื่อมต่อ MongoDB
+connectDB(); // ✅ เรียกใช้งาน
 
 // View Engine Setup
 app.set('views', path.join(__dirname, 'views'));
