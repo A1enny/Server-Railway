@@ -34,7 +34,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Routes
 app.use('/', indexRouter);
 app.use('/api/users', usersRouter);
-app.use('/products', products);
 app.use('/api/materials', materialsRoutes);
 app.use("/api/tables", tableRoutes(io)); 
 app.use("/api/shelf_life", shelfLifeRoutes);
