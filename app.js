@@ -56,11 +56,11 @@ app.use(function(err, req, res, next) {
 });
 
 // Start Server
-const PORT = process.env.PORT; // ใช้พอร์ตที่ Railway กำหนด
+const PORT = process.env.PORT || 3000;  // กำหนดให้ใช้ค่าพอร์ตที่ Railway ให้มา
 console.log(`✅ Using PORT: ${PORT}`);
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
 
 module.exports = app;
