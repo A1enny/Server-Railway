@@ -6,13 +6,16 @@ module.exports = (io) => {
   // ✅ ดึงข้อมูลวัตถุดิบ พร้อมค้นหา และกรองตามหมวดหมู่
   router.get("/", async (req, res) => {
     try {
+      // ✅ รับค่าพารามิเตอร์ page และ limit (ค่าตั้งต้น = 10)
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 10;
       const offset = (page - 1) * limit;
 
+      // ✅ รับค่าการค้นหา และหมวดหมู่ (ใช้ "%" เพื่อรองรับ LIKE)
       const search = req.query.search ? `%${req.query.search}%` : "%";
       const category = req.query.category ? req.query.category : "%";
 
+      // ✅ นับจำนวนวัตถุดิบทั้งหมดที่ค้นหาหรือกรอง
       const [[{ total }]] = await db.query(
         `SELECT COUNT(*) AS total 
        FROM materials 
@@ -21,6 +24,7 @@ module.exports = (io) => {
         [search, category, category]
       );
 
+      // ✅ ดึงข้อมูลวัตถุดิบ พร้อมกรองการค้นหา และหมวดหมู่
       const [rows] = await db.query(
         `SELECT 
     m.material_id, 
@@ -33,7 +37,7 @@ module.exports = (io) => {
       'N/A'
     ) AS expiration_date, 
     u.unit_name,
-    m.stock AS total_quantity,
+    m.stock AS total_quantity, -- ใช้ stock จาก materials โดยตรง
     CASE 
         WHEN m.stock <= 0 THEN 'หมด'
         WHEN m.stock <= m.min_stock THEN 'ต่ำกว่ากำหนด'
