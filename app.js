@@ -35,7 +35,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use('/api/users', usersRouter);
 app.use('/products', products);
 
 // Catch 404 and Forward to Error Handler
@@ -53,7 +53,7 @@ app.use(function(err, req, res, next) {
 });
 
 // Start Server (ถ้ายังไม่มีไฟล์ `bin/www`)
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 console.log(`✅ Using PORT: ${PORT}`);
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
