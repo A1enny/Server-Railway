@@ -73,7 +73,7 @@ module.exports = (io) => {
         FROM materials m
         LEFT JOIN categories c ON m.category_id = c.category_id
         LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
-        LEFT JOIN units u ON m.unit_id = u.id  -- ✅ ใช้ units แทน unit
+        LEFT JOIN unit u ON m.unit_id = u.id  -- ✅ ใช้ units แทน unit
         LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
         ORDER BY m.material_id ASC
         LIMIT 10`;

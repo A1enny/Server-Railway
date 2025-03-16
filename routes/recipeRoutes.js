@@ -192,7 +192,7 @@ router.get("/:id", async (req, res) => {
        FROM recipe_ingredients ri
        LEFT JOIN materials m ON ri.material_id = m.material_id  
        LEFT JOIN categories c ON m.category_id = c.category_id
-       LEFT JOIN units u ON m.unit_id = u.unit_id  -- 🔄 เปลี่ยนจาก units เป็น unit
+       LEFT JOIN unit u ON m.unit_id = u.unit_id  -- 🔄 เปลี่ยนจาก units เป็น unit
        WHERE ri.recipe_id = ?`, 
       [id]
     );    

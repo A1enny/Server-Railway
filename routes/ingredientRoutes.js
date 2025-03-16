@@ -48,7 +48,7 @@ module.exports = (io) => {
 FROM materials m
 LEFT JOIN categories c ON m.category_id = c.category_id
 LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
-LEFT JOIN units u ON m.unit_id = u.unit_id
+LEFT JOIN unit u ON m.unit_id = u.unit_id
 LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
 WHERE m.name LIKE ? 
   AND (m.category_id = ? OR ? = '%')
@@ -107,7 +107,7 @@ LIMIT ? OFFSET ?
       FROM materials m
       LEFT JOIN categories c ON m.category_id = c.category_id
       LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
-      LEFT JOIN units u ON m.unit_id = u.unit_id
+      LEFT JOIN unit u ON m.unit_id = u.unit_id
       LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
       WHERE m.material_id = ?`,
         [id]
