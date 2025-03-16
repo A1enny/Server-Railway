@@ -34,7 +34,7 @@ const inventoryRoutes = require("./routes/inventoryRoutes");
 const unitRoutes = require("./routes/unitRoutes");
 const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
 const tableRoutes = require("./routes/tableRoutes")(io);
-const materialsRoutes = require('./routes/ingredientRoutes')(io); // ✅ io ถูกกำหนดแล้ว
+const materialsRoutes = require("./routes/ingredientRoutes")(io);
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/usersRoutes');
 
@@ -57,7 +57,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Routes
 app.use('/', indexRouter);
 app.use('/api/users', usersRouter);
-app.use('/api/materials', materialsRoutes);
+app.use("/api/materials", materialsRoutes);
 app.use("/api/tables", tableRoutes);
 app.use("/api/shelf_life", shelfLifeRoutes);
 app.use("/api/units", unitRoutes);
