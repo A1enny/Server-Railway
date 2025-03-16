@@ -1,17 +1,26 @@
-const mongoose = require('mongoose');
+const mysql = require('mysql2');
 require('dotenv').config();
 
-const connectDB = async () => {
-    try {
-        await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-        });
-        console.log('✅ MongoDB Connected Successfully!');
-    } catch (error) {
-        console.error('❌ MongoDB Connection Error:', error);
+// สร้าง Connection Pool
+const pool = mysql.createPool({
+    host: process.env.MYSQL_HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    port: process.env.MYSQL_PORT || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
+
+// ตรวจสอบการเชื่อมต่อ
+pool.getConnection((err, connection) => {
+    if (err) {
+        console.error('❌ MySQL Connection Error:', err);
         process.exit(1);
     }
-};
+    console.log('✅ MySQL Connected Successfully!');
+    connection.release();
+});
 
-module.exports = connectDB; 
+module.exports = pool.promise();
