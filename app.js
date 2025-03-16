@@ -14,7 +14,13 @@ const usersRouter = require('./routes/usersRoutes');
 
 const app = express(); // ต้องสร้าง Express ก่อนใช้ `app.use()`
 
-app.use(cors({ origin: '*' })); // แก้ไขให้ CORS ใช้งานได้ถูกต้อง
+const cors = require('cors');
+
+app.use(cors({
+    origin: '*', 
+    methods: 'GET,POST,PUT,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type,Authorization'
+}));
 
 // เชื่อมต่อ MongoDB
 connectDB(); // ✅ เรียกใช้งาน
