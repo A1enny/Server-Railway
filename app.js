@@ -56,7 +56,7 @@ app.use(function(err, req, res, next) {
 });
 
 // Start Server
-const PORT = process.env.PORT || 8080; // ใช้ค่าจาก Environment ถ้าไม่มีให้ใช้ 8080
+const PORT = process.env.PORT || 3000; // ใช้ค่าจาก Environment ถ้าไม่มีให้ใช้ 8080
 console.log(`✅ Using PORT: ${PORT}`);
 
 app.listen(PORT, '0.0.0.0', () => {
