@@ -43,6 +43,10 @@ app.use(function(req, res, next) {
   next(createError(404));
 });
 
+app.get('/api/test', (req, res) => {
+  res.json({ message: "✅ API is working!" });
+});
+
 // Error Handler
 app.use(function(err, req, res, next) {
   res.locals.message = err.message;
