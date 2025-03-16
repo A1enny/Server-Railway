@@ -3,20 +3,20 @@
 /**
  * Module dependencies.
  */
-const app = require('../app'); // ✅ ใช้ const และตรวจสอบว่า app.js export ถูกต้อง
-const debug = require('debug')('express-api:server');
-const http = require('http');
+var { app } = require('../app'); // ✅ แก้ให้ดึงเฉพาะ app
+var debug = require('debug')('express-api:server');
+var http = require('http');
 
 /**
  * Get port from environment and store in Express.
  */
-const port = normalizePort(process.env.PORT || '3000');
+var port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 
 /**
  * Create HTTP server.
  */
-const server = http.createServer(app);
+var server = http.createServer(app);
 
 /**
  * Listen on provided port, on all network interfaces.
@@ -29,7 +29,7 @@ server.on('listening', onListening);
  * Normalize a port into a number, string, or false.
  */
 function normalizePort(val) {
-  const port = parseInt(val, 10);
+  var port = parseInt(val, 10);
 
   if (isNaN(port)) {
     return val; // named pipe
@@ -48,7 +48,7 @@ function onError(error) {
     throw error;
   }
 
-  const bind = typeof port === 'string'
+  var bind = typeof port === 'string'
     ? 'Pipe ' + port
     : 'Port ' + port;
 
@@ -73,8 +73,8 @@ function onError(error) {
  * Event listener for HTTP server "listening" event.
  */
 function onListening() {
-  const addr = server.address();
-  const bind = typeof addr === 'string'
+  var addr = server.address();
+  var bind = typeof addr === 'string'
     ? 'pipe ' + addr
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
