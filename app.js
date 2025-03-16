@@ -35,7 +35,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/api/users', usersRouter);
 app.use('/products', products);
-
+app.use('/api/materials', materialsRoutes);
+app.use("/api/tables", tableRoutes(io)); 
+app.use("/api/shelf_life", shelfLifeRoutes);
+app.use("/api/units", unitRoutes);
+app.use("/api/inventory", inventoryRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/report", reportRoutes);
+app.use("/api/recipes", recipeRoutes);
+app.use("/api/sales", saleRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/menus", menuRoutes);
+app.use("/api/orders", orderRoutes(io));
 // ทดสอบ API
 app.get('/api/test', (req, res) => {
     res.json({ message: "✅ API is working!" });
