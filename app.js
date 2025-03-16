@@ -1,15 +1,28 @@
-require('dotenv').config(); 
-var createError = require('http-errors'); 
+require('dotenv').config();
+var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 const cors = require('cors');
+const http = require('http'); // 👈 เพิ่ม http module
+const socketIo = require('socket.io'); // 👈 เพิ่ม socket.io
 
 // ใช้ MySQL แทน MongoDB
 require('./config/db');
 
-const orderRoutes = require("./routes/orderRoutes");
+const app = express();
+const server = http.createServer(app); // 👈 กำหนด server HTTP
+const io = socketIo(server, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization']
+    }
+});
+
+// 👇 ตอนนี้ `io` ถูกกำหนดแล้ว จึงสามารถใช้ใน Routes ได้
+const orderRoutes = require("./routes/orderRoutes")(io);
 const menuRoutes = require("./routes/menuRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const saleRoutes = require("./routes/saleRoutes");
@@ -20,15 +33,13 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const unitRoutes = require("./routes/unitRoutes");
 const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
-const tableRoutes = require("./routes/tableRoutes");
-const materialsRoutes = require('./routes/ingredientRoutes')(io);
+const tableRoutes = require("./routes/tableRoutes")(io);
+const materialsRoutes = require('./routes/ingredientRoutes')(io); // ✅ ตอนนี้ io ถูกกำหนดก่อนเรียกใช้
 const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/usersRoutes');
 
-const app = express();
-
 app.use(cors({
-    origin: '*', 
+    origin: '*',
     methods: 'GET,POST,PUT,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type,Authorization'
 }));
@@ -47,7 +58,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/materials', materialsRoutes);
-app.use("/api/tables", tableRoutes(io)); 
+app.use("/api/tables", tableRoutes);
 app.use("/api/shelf_life", shelfLifeRoutes);
 app.use("/api/units", unitRoutes);
 app.use("/api/inventory", inventoryRoutes);
@@ -58,7 +69,8 @@ app.use("/api/recipes", recipeRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/menus", menuRoutes);
-app.use("/api/orders", orderRoutes(io));
+app.use("/api/orders", orderRoutes);
+
 // ทดสอบ API
 app.get('/api/test', (req, res) => {
     res.json({ message: "✅ API is working!" });
@@ -66,27 +78,22 @@ app.get('/api/test', (req, res) => {
 
 // Catch 404 and Forward to Error Handler
 app.use(function(req, res, next) {
-  next(createError(404));
+    next(createError(404));
 });
 
 // Error Handler
 app.use(function(err, req, res, next) {
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
+    res.locals.message = err.message;
+    res.locals.error = req.app.get('env') === 'development' ? err : {};
 
-  res.status(err.status || 500);
-  res.render('error');
+    res.status(err.status || 500);
+    res.render('error');
 });
 
 // Start Server
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+});
 
-// const PORT = process.env.PORT || 3000; // ต้องใช้ process.env.PORT เท่านั้น ห้าม hardcode
-// app.set('port', PORT);
-
-// const server = http.createServer(app);
-
-// server.listen(PORT, () => {
-//     console.log(`✅ Server running on port ${PORT}`);
-// });
-
-module.exports = app;
+module.exports = { app, io };
