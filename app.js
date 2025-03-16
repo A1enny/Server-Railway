@@ -57,13 +57,13 @@ app.use(function(err, req, res, next) {
 
 // Start Server
 
-const PORT = process.env.PORT || 3000; // ต้องใช้ process.env.PORT เท่านั้น ห้าม hardcode
-app.set('port', PORT);
+// const PORT = process.env.PORT || 3000; // ต้องใช้ process.env.PORT เท่านั้น ห้าม hardcode
+// app.set('port', PORT);
 
-const server = http.createServer(app);
+// const server = http.createServer(app);
 
-server.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-});
+// server.listen(PORT, () => {
+//     console.log(`✅ Server running on port ${PORT}`);
+// });
 
 module.exports = app;
