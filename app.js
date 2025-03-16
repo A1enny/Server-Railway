@@ -6,8 +6,10 @@ var logger = require('morgan');
 const mongoose = require('mongoose');
 const products = require('./routes/products');
 require('dotenv').config()
-const uri = process.env.MONGO_URI
+const cors = require('cors');
+const uri = process.env.MONGO_URI;
 
+app.use(cors());
 
 mongoose.Promise = global.Promise;
 
