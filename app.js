@@ -24,7 +24,6 @@ const io = socketIo(server, {
 // 📌 ตรวจสอบว่า Routes รองรับ io หรือไม่
 const orderRoutes = require("./routes/orderRoutes")(io);
 const tableRoutes = require("./routes/tableRoutes")(io);
-const materialsRoutes = require("./routes/ingredientRoutes"); // ❌ เอา io ออกถ้าไม่รองรับ
 const menuRoutes = require("./routes/menuRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const saleRoutes = require("./routes/saleRoutes");
