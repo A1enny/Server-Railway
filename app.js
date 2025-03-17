@@ -8,7 +8,7 @@ const cors = require('cors');
 const http = require('http'); // ใช้ HTTP Server
 const socketIo = require('socket.io'); // ใช้ Socket.io
 
-// ใช้ MySQL แทน MongoDB
+// 📌 ใช้ MySQL แทน MongoDB
 require('./config/db');
 
 const app = express();
@@ -21,10 +21,10 @@ const io = socketIo(server, {
     }
 });
 
-// 📌 ใช้ `io` ใน routes ที่ต้องใช้
+// 📌 ตรวจสอบว่า Routes รองรับ io หรือไม่
 const orderRoutes = require("./routes/orderRoutes")(io);
 const tableRoutes = require("./routes/tableRoutes")(io);
-const materialsRoutes = require("./routes/ingredientRoutes")(io);
+const materialsRoutes = require("./routes/ingredientRoutes"); // ❌ เอา io ออกถ้าไม่รองรับ
 const menuRoutes = require("./routes/menuRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const saleRoutes = require("./routes/saleRoutes");
@@ -32,7 +32,7 @@ const recipeRoutes = require("./routes/recipeRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
-const inventoryRoutes = require("./routes/inventoryRoutes");
+const inventoryRoutes = require("./routes/inventoryRoutes")(io); // ✅ ให้แน่ใจว่า inventoryRoutes รองรับ io
 const unitRoutes = require("./routes/unitRoutes");
 const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
 const indexRouter = require('./routes/index');
@@ -44,9 +44,9 @@ app.use(cors({
     allowedHeaders: 'Content-Type,Authorization'
 }));
 
-// View Engine Setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'jade');
+// ✅ ถ้าใช้ API เท่านั้น สามารถลบ View Engine ได้
+// app.set('views', path.join(__dirname, 'views'));
+// app.set('view engine', 'jade'); ❌ เปลี่ยนเป็น JSON API
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -54,7 +54,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Routes
+// ✅ Routes
 app.use('/', indexRouter);
 app.use('/api/users', usersRouter);
 app.use("/api/materials", materialsRoutes);
@@ -71,24 +71,23 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/menus", menuRoutes);
 app.use("/api/orders", orderRoutes);
 
-// ทดสอบ API
+// ✅ ทดสอบ API
 app.get('/api/test', (req, res) => {
     res.json({ message: "✅ API is working!" });
 });
 
-// Catch 404 and Forward to Error Handler
-app.use(function(req, res, next) {
+// ✅ Catch 404 and Forward to Error Handler
+app.use((req, res, next) => {
     next(createError(404));
 });
 
-// Error Handler
-app.use(function(err, req, res, next) {
-    res.locals.message = err.message;
-    res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-    res.status(err.status || 500);
-    res.render('error');
+// ✅ Error Handler (แสดง Error เป็น JSON แทน Jade)
+app.use((err, req, res, next) => {
+    res.status(err.status || 500).json({
+        error: err.message || "❌ Internal Server Error",
+        status: err.status || 500
+    });
 });
 
-// 📌 แก้ไขการ Export ให้รองรับการทำงานกับ bin/www
+// 📌 แก้ไขการ Export ให้รองรับ `bin/www`
 module.exports = { app, server, io };
