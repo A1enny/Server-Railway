@@ -22,8 +22,8 @@ const io = socketIo(server, {
 });
 
 // 📌 ตรวจสอบว่า Routes รองรับ io หรือไม่
-const orderRoutes = require("./routes/orderRoutes")(io);
-const tableRoutes = require("./routes/tableRoutes")(io);
+const orderRoutes = require("./routes/orderRoutes");
+const tableRoutes = require("./routes/tableRoutes");
 const menuRoutes = require("./routes/menuRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const saleRoutes = require("./routes/saleRoutes");
@@ -31,7 +31,7 @@ const recipeRoutes = require("./routes/recipeRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
-const inventoryRoutes = require("./routes/inventoryRoutes")(io); // ✅ ให้แน่ใจว่า inventoryRoutes รองรับ io
+const inventoryRoutes = require("./routes/inventoryRoutes")
 const unitRoutes = require("./routes/unitRoutes");
 const shelfLifeRoutes = require("./routes/shelfLifeRoutes");
 const indexRouter = require('./routes/index');
@@ -59,7 +59,8 @@ app.use('/api/users', usersRouter);
 app.use("/api/tables", tableRoutes);
 app.use("/api/shelf_life", shelfLifeRoutes);
 app.use("/api/units", unitRoutes);
-app.use("/api/inventory", inventoryRoutes);
+app.use("/api/inventory", inventoryRoutes(io)); // ใส่ (io) ที่นี่แทน
+app.use("/api/orders", orderRoutes(io)); // ใส่ (io) ที่นี่แทน
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/report", reportRoutes);
@@ -67,7 +68,7 @@ app.use("/api/recipes", recipeRoutes);
 app.use("/api/sales", saleRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/menus", menuRoutes);
-app.use("/api/orders", orderRoutes);
+
 
 // ✅ ทดสอบ API
 app.get('/api/test', (req, res) => {
