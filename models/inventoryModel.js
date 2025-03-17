@@ -42,6 +42,7 @@ const InventoryModel = {
       LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
       WHERE m.name LIKE ? 
         AND (m.category_id = ? OR ? = '%')
+      GROUP BY m.material_id, c.category_name, u.unit_name, received_date, expiration_date
       ORDER BY m.material_id ASC
       LIMIT ? OFFSET ?`,
       [search, category, category, limit, offset]
@@ -53,14 +54,16 @@ const InventoryModel = {
   // ✅ ดึงข้อมูลวัตถุดิบตาม ID
   async getMaterialById(id) {
     const [rows] = await db.query(
-      `SELECT * FROM materials WHERE material_id = ?`,
+      `SELECT m.*, u.unit_name FROM materials m
+       LEFT JOIN unit u ON m.unit_id = u.unit_id
+       WHERE m.material_id = ?`,
       [id]
     );
     return rows.length > 0 ? rows[0] : null;
   },
 
   // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
-  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit }) {
+  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit_id }) {
     const [existingMaterial] = await db.query(
       `SELECT material_id FROM materials WHERE name = ? AND category_id = ?`,
       [name, category_id]
@@ -71,8 +74,8 @@ const InventoryModel = {
       materialId = existingMaterial[0].material_id;
     } else {
       const [insertResult] = await db.query(
-        `INSERT INTO materials (name, category_id, unit) VALUES (?, ?, ?)`,
-        [name, category_id, unit]
+        `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
+        [name, category_id, unit_id]
       );
       materialId = insertResult.insertId;
     }
@@ -97,7 +100,7 @@ const InventoryModel = {
       await connection.beginTransaction();
 
       for (const item of batch) {
-        const { name, category_id, quantity, received_date, expiration_date, price, unit } = item;
+        const { name, category_id, quantity, received_date, expiration_date, price, unit_id } = item;
 
         const [existingMaterial] = await connection.query(
           `SELECT material_id FROM materials WHERE name = ? AND category_id = ?`,
@@ -109,8 +112,8 @@ const InventoryModel = {
           materialId = existingMaterial[0].material_id;
         } else {
           const [insertResult] = await connection.query(
-            `INSERT INTO materials (name, category_id, unit) VALUES (?, ?, ?)`,
-            [name, category_id, unit]
+            `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
+            [name, category_id, unit_id]
           );
           materialId = insertResult.insertId;
         }
