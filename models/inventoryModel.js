@@ -214,4 +214,47 @@ exports.getMostUsedMaterials = async () => {
   return rows;
 };
 
+exports.getUsageStatistics = async () => {
+  const sql =
+    "SELECT material_id, material_name, COUNT(*) as usage_count FROM material_usage GROUP BY material_id ORDER BY usage_count DESC LIMIT 10";
+  const [rows] = await db.query(sql);
+  return rows;
+};
+
+exports.getUnitId = async (unitName) => {
+  const sql = "SELECT unit_id FROM units WHERE unit_name = ?";
+  const [rows] = await db.query(sql, [unitName]);
+  return rows.length > 0 ? rows[0].unit_id : null;
+};
+
+exports.addMaterial = async (data) => {
+  const sql =
+    "INSERT INTO materials (name, category_id, quantity, received_date, expiration_date, price, unit_id) VALUES (?, ?, ?, ?, ?, ?, ?)";
+  const [result] = await db.query(sql, [
+    data.name,
+    data.category_id,
+    data.quantity,
+    data.received_date,
+    data.expiration_date,
+    data.price,
+    data.unit_id,
+  ]);
+  return result;
+};
+exports.addBatch = async (batchData) => {
+  const sql =
+    "INSERT INTO materials (name, category_id, quantity, received_date, expiration_date, price, unit_id) VALUES ?";
+  const values = batchData.map((item) => [
+    item.name,
+    item.category_id,
+    item.quantity,
+    item.received_date,
+    item.expiration_date,
+    item.price,
+    item.unit_id,
+  ]);
+  const [result] = await db.query(sql, [values]);
+  return result;
+};
+
 module.exports = InventoryModel;

@@ -9,7 +9,12 @@ exports.getMaterials = async (req, res) => {
     const search = req.query.search ? `%${req.query.search}%` : "%";
     const category = req.query.category || "%";
 
-    const { total, rows } = await InventoryModel.getMaterials({ search, category, limit, offset });
+    const { total, rows } = await InventoryModel.getMaterials({
+      search,
+      category,
+      limit,
+      offset,
+    });
 
     res.json({
       success: true,
@@ -40,58 +45,74 @@ exports.getMaterialById = async (req, res) => {
 
 // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
 exports.addMaterial = async (req, res) => {
+  const {
+    name,
+    category_id,
+    quantity,
+    received_date,
+    expiration_date,
+    price,
+    unit,
+  } = req.body;
+  if (
+    !name ||
+    !category_id ||
+    !quantity ||
+    !received_date ||
+    !expiration_date ||
+    !price ||
+    !unit
+  ) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
   try {
-    const { name, category_id, quantity, received_date, expiration_date, price, unit } = req.body;
-
-    if (!name || !category_id || !quantity || !expiration_date || !price || !unit) {
-      return res.status(400).json({ error: "❌ กรุณากรอกข้อมูลให้ครบ" });
+    const unit_id = await InventoryModel.getUnitId(unit); // ดึง `unit_id` จากชื่อ unit
+    if (!unit_id) {
+      return res.status(400).json({ error: "Invalid unit" });
     }
-
-    const materialId = await InventoryModel.addMaterial({
+    const result = await InventoryModel.addMaterial({
       name,
       category_id,
       quantity,
-      received_date: received_date || new Date(),
+      received_date,
       expiration_date,
       price,
-      unit,
+      unit_id,
     });
-
-    res.status(201).json({
-      success: true,
-      message: "✅ เพิ่มวัตถุดิบสำเร็จ!",
-      material_id: materialId,
-    });
+    res.status(201).json({ success: true, material_id: result.insertId });
   } catch (error) {
-    console.error("❌ Error adding material:", error);
-    res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการเพิ่มวัตถุดิบ" });
+    res.status(500).json({ error: "Failed to add material" });
   }
 };
 
 // ✅ เพิ่มวัตถุดิบแบบล็อต (batch)
-exports.addBatchMaterials = async (req, res) => {
+exports.addBatch = async (req, res) => {
+  const { batch } = req.body;
+  if (!batch || !Array.isArray(batch) || batch.length === 0) {
+    return res.status(400).json({ error: "Invalid batch data" });
+  }
   try {
-    const { batch } = req.body;
-
-    if (!Array.isArray(batch) || batch.length === 0) {
-      return res.status(400).json({ error: "❌ กรุณาเพิ่มข้อมูลวัตถุดิบในล็อต" });
-    }
-
-    for (const item of batch) {
-      if (!item.name || !item.category_id || !item.quantity || !item.expiration_date || !item.price || !item.unit) {
-        return res.status(400).json({ error: "❌ กรุณากรอกข้อมูลในแต่ละรายการให้ครบ" });
-      }
-    }
-
-    const insertedCount = await InventoryModel.addBatchMaterials(batch);
-
-    res.status(201).json({
-      success: true,
-      message: `✅ เพิ่มวัตถุดิบล็อตสำเร็จ! จำนวน ${insertedCount} รายการ`,
-    });
+    const batchData = await Promise.all(
+      batch.map(async (item) => {
+        const unit_id = await InventoryModel.getUnitId(item.unit);
+        if (!unit_id) throw new Error("Invalid unit");
+        return {
+          name: item.name,
+          category_id: item.category,
+          quantity: item.quantity,
+          received_date: item.received_date,
+          expiration_date: item.expiration_date,
+          price: item.price,
+          unit_id: unit_id,
+        };
+      })
+    );
+    await InventoryModel.addBatch(batchData);
+    res
+      .status(201)
+      .json({ success: true, message: "Batch added successfully" });
   } catch (error) {
-    console.error("❌ Error adding batch materials:", error);
-    res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการเพิ่มวัตถุดิบล็อต" });
+    res.status(500).json({ error: "Failed to add batch" });
   }
 };
 
@@ -113,13 +134,17 @@ exports.getMaterialBatches = async (req, res) => {
     const batches = await InventoryModel.getMaterialBatches(materialId);
 
     if (!batches || batches.length === 0) {
-      return res.status(404).json({ error: "❌ ไม่พบข้อมูลล็อตของวัตถุดิบนี้" });
+      return res
+        .status(404)
+        .json({ error: "❌ ไม่พบข้อมูลล็อตของวัตถุดิบนี้" });
     }
 
     res.json({ success: true, batches });
   } catch (error) {
     console.error("❌ Error fetching material batches:", error);
-    res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลล็อตวัตถุดิบ" });
+    res
+      .status(500)
+      .json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลล็อตวัตถุดิบ" });
   }
 };
 
@@ -142,10 +167,15 @@ exports.updateStock = async (req, res) => {
     const { material_id, quantity_used } = req.body;
 
     if (!material_id || !quantity_used) {
-      return res.status(400).json({ error: "❌ กรุณาระบุรหัสวัตถุดิบและจำนวนที่ใช้" });
+      return res
+        .status(400)
+        .json({ error: "❌ กรุณาระบุรหัสวัตถุดิบและจำนวนที่ใช้" });
     }
 
-    const updated = await InventoryModel.updateStock(material_id, quantity_used);
+    const updated = await InventoryModel.updateStock(
+      material_id,
+      quantity_used
+    );
 
     if (!updated) {
       return res.status(404).json({ error: "❌ วัตถุดิบไม่พบ หรือสต็อกไม่พอ" });
@@ -165,6 +195,16 @@ exports.getMostUsedMaterials = async (req, res) => {
     res.json({ success: true, materials });
   } catch (error) {
     console.error("❌ Error fetching most used materials:", error);
-    res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลวัตถุดิบที่ใช้บ่อย" });
+    res
+      .status(500)
+      .json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลวัตถุดิบที่ใช้บ่อย" });
+  }
+};
+exports.getUsageStats = async (req, res) => {
+  try {
+    const stats = await InventoryModel.getUsageStatistics();
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: "Error fetching usage stats" });
   }
 };
