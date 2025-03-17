@@ -1,20 +1,29 @@
 const express = require("express");
-const router = express.Router();
 const inventoryController = require("../controllers/inventoryController");
 
 module.exports = (io) => {
-  router.get("/", inventoryController.getMaterials);
-  router.get("/:id", inventoryController.getMaterialById);
-  router.post("/", inventoryController.addMaterial);
-  router.post("/batch", inventoryController.addBatchMaterials);
-  router.delete("/:id", inventoryController.deleteMaterial);
+  const router = express.Router();
 
-  // ✅ เส้นทางใหม่
-  router.get("/:id/batches", inventoryController.getMaterialBatches); // ดูล็อตของวัตถุดิบ
-  router.delete("/batch/:batchId", inventoryController.deleteBatch); // ลบล็อตวัตถุดิบ
-  router.post("/update-stock", inventoryController.updateStock); // อัปเดตสต็อกอัตโนมัติ
-  router.get("/most-used", inventoryController.getMostUsedMaterials); // ดูวัตถุดิบที่ใช้บ่อยที่สุด
-  router.get("/usage-stats", inventoryController.getUsageStats);
+  // ✅ เส้นทางที่ไม่มีไอดี ต้องมาก่อน
+  router.get("/most-used", (req, res) => inventoryController.getMostUsedMaterials(req, res, io));
+  router.get("/usage-stats", (req, res) => inventoryController.getUsageStats(req, res, io));
+
+  router.get("/", (req, res) => inventoryController.getMaterials(req, res, io));
+  router.post("/", (req, res) => inventoryController.addMaterial(req, res, io));
+  router.post("/batch", (req, res) => inventoryController.addBatchMaterials(req, res, io));
+
+  // ✅ API การอัปเดตและลบข้อมูล
+  router.delete("/:id", (req, res) => inventoryController.deleteMaterial(req, res, io));
+  router.delete("/batch/:batchId", (req, res) => inventoryController.deleteBatch(req, res, io));
+
+  // ✅ API ดูล็อตของวัตถุดิบ
+  router.get("/:id/batches", (req, res) => inventoryController.getMaterialBatches(req, res, io));
+
+  // ✅ API อัปเดตสต็อกอัตโนมัติ
+  router.post("/update-stock", (req, res) => inventoryController.updateStock(req, res, io));
+
+  // ✅ API ดูวัตถุดิบตามไอดี
+  router.get("/:id", (req, res) => inventoryController.getMaterialById(req, res, io));
 
   return router;
 };
