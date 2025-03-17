@@ -13,38 +13,39 @@ const InventoryModel = {
 
     const [rows] = await db.query(
       `SELECT 
-        m.material_id, 
-        m.name AS material_name, 
-        c.category_name, 
-        COALESCE(MIN(ib.received_date), m.received_date, 'N/A') AS received_date, 
-        COALESCE(
-          MIN(ib.expiration_date), 
-          DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY), 
-          'N/A'
-        ) AS expiration_date, 
-        u.unit_name,
-        SUM(m.stock) AS total_quantity,
-        CASE 
-          WHEN SUM(m.stock) <= 0 THEN 'หมด'
-          WHEN SUM(m.stock) <= m.min_stock THEN 'ต่ำกว่ากำหนด'
-          WHEN COALESCE(MIN(ib.expiration_date), 
-            DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
-          ) <= CURDATE() THEN 'หมดอายุแล้ว'
-          WHEN COALESCE(MIN(ib.expiration_date), 
-            DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
-          ) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
-          ELSE 'ปกติ'
-        END AS status
-      FROM materials m
-      LEFT JOIN categories c ON m.category_id = c.category_id
-      LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
-      LEFT JOIN unit u ON m.unit_id = u.unit_id
-      LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
-      WHERE m.name LIKE ? 
-        AND (m.category_id = ? OR ? = '%')
-      GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.received_date, m.min_stock, sl.shelf_life_days
-      ORDER BY m.material_id ASC
-      LIMIT ? OFFSET ?`,
+    m.material_id, 
+    m.name AS material_name, 
+    c.category_name, 
+    COALESCE(MIN(ib.received_date), m.received_date, 'N/A') AS received_date, 
+    COALESCE(
+      MIN(ib.expiration_date), 
+      DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY), 
+      'N/A'
+    ) AS expiration_date, 
+    u.unit_name,
+    SUM(m.stock) AS total_quantity,
+    CASE 
+      WHEN SUM(m.stock) <= 0 THEN 'หมด'
+      WHEN SUM(m.stock) <= m.min_stock THEN 'ต่ำกว่ากำหนด'
+      WHEN COALESCE(MIN(ib.expiration_date), 
+        DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
+      ) <= CURDATE() THEN 'หมดอายุแล้ว'
+      WHEN COALESCE(MIN(ib.expiration_date), 
+        DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
+      ) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
+      ELSE 'ปกติ'
+    END AS status
+FROM materials m
+LEFT JOIN categories c ON m.category_id = c.category_id
+LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
+LEFT JOIN unit u ON m.unit_id = u.unit_id
+LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
+WHERE m.name LIKE ? 
+  AND (m.category_id = ? OR ? = '%')
+GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.received_date, m.min_stock, sl.shelf_life_days
+ORDER BY m.material_id ASC
+LIMIT ? OFFSET ?;
+`,
       [search, category, category, limit, offset]
     );
 
@@ -63,7 +64,15 @@ const InventoryModel = {
   },
 
   // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
-  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit_id }) {
+  async addMaterial({
+    name,
+    category_id,
+    quantity,
+    received_date,
+    expiration_date,
+    price,
+    unit_id,
+  }) {
     const [existingMaterial] = await db.query(
       `SELECT material_id FROM materials WHERE name = ? AND category_id = ?`,
       [name, category_id]
@@ -100,7 +109,15 @@ const InventoryModel = {
       await connection.beginTransaction();
 
       for (const item of batch) {
-        const { name, category_id, quantity, received_date, expiration_date, price, unit_id } = item;
+        const {
+          name,
+          category_id,
+          quantity,
+          received_date,
+          expiration_date,
+          price,
+          unit_id,
+        } = item;
 
         const [existingMaterial] = await connection.query(
           `SELECT material_id FROM materials WHERE name = ? AND category_id = ?`,
