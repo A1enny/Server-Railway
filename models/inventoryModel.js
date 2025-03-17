@@ -16,22 +16,22 @@ const InventoryModel = {
         m.material_id, 
         m.name AS material_name, 
         c.category_name, 
-        COALESCE(ib.received_date, m.received_date, 'N/A') AS received_date, 
+        COALESCE(MIN(ib.received_date), m.received_date, 'N/A') AS received_date, 
         COALESCE(
-          ib.expiration_date, 
-          DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY), 
+          MIN(ib.expiration_date), 
+          DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY), 
           'N/A'
         ) AS expiration_date, 
         u.unit_name,
-        m.stock AS total_quantity,
+        SUM(m.stock) AS total_quantity,
         CASE 
-          WHEN m.stock <= 0 THEN 'หมด'
-          WHEN m.stock <= m.min_stock THEN 'ต่ำกว่ากำหนด'
-          WHEN COALESCE(ib.expiration_date, 
-            DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY)
+          WHEN SUM(m.stock) <= 0 THEN 'หมด'
+          WHEN SUM(m.stock) <= m.min_stock THEN 'ต่ำกว่ากำหนด'
+          WHEN COALESCE(MIN(ib.expiration_date), 
+            DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
           ) <= CURDATE() THEN 'หมดอายุแล้ว'
-          WHEN COALESCE(ib.expiration_date, 
-            DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY)
+          WHEN COALESCE(MIN(ib.expiration_date), 
+            DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
           ) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
           ELSE 'ปกติ'
         END AS status
@@ -42,7 +42,7 @@ const InventoryModel = {
       LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
       WHERE m.name LIKE ? 
         AND (m.category_id = ? OR ? = '%')
-      GROUP BY m.material_id, c.category_name, u.unit_name, received_date, expiration_date
+      GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.received_date, m.min_stock, sl.shelf_life_days
       ORDER BY m.material_id ASC
       LIMIT ? OFFSET ?`,
       [search, category, category, limit, offset]
