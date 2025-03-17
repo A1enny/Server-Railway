@@ -19,11 +19,11 @@ const InventoryModel = {
         ib.received_date, 
         ib.expiration_date, 
         u.unit_name,
-        ib.quantity AS total_quantity,
+        SUM(ib.quantity) AS total_quantity,
         CASE 
-          WHEN ib.quantity <= 0 THEN 'หมด'
-          WHEN ib.expiration_date <= CURDATE() THEN 'หมดอายุแล้ว'
-          WHEN ib.expiration_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
+          WHEN SUM(ib.quantity) <= 0 THEN 'หมด'
+          WHEN MIN(ib.expiration_date) <= CURDATE() THEN 'หมดอายุแล้ว'
+          WHEN MIN(ib.expiration_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
           ELSE 'ปกติ'
         END AS status
       FROM materials m
@@ -32,6 +32,7 @@ const InventoryModel = {
       LEFT JOIN unit u ON m.unit_id = u.unit_id
       WHERE m.name LIKE ? 
         AND (m.category_id = ? OR ? = '%')
+      GROUP BY m.material_id
       ORDER BY m.material_id ASC
       LIMIT ? OFFSET ?`,
       [search, category, category, limit, offset]
@@ -51,14 +52,21 @@ const InventoryModel = {
 
   // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
   async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit }) {
-    const [result] = await db.query(
-      `INSERT INTO materials (name, category_id, unit) 
-       VALUES (?, ?, ?) 
-       ON DUPLICATE KEY UPDATE name = VALUES(name)`,
-      [name, category_id, unit]
+    const [existingMaterial] = await db.query(
+      `SELECT material_id FROM materials WHERE name = ? AND category_id = ?`,
+      [name, category_id]
     );
 
-    const materialId = result.insertId || (await db.query(`SELECT material_id FROM materials WHERE name = ?`, [name]))[0][0].material_id;
+    let materialId;
+    if (existingMaterial.length > 0) {
+      materialId = existingMaterial[0].material_id;
+    } else {
+      const [insertResult] = await db.query(
+        `INSERT INTO materials (name, category_id, unit) VALUES (?, ?, ?)`,
+        [name, category_id, unit]
+      );
+      materialId = insertResult.insertId;
+    }
 
     await db.query(
       `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
@@ -114,6 +122,19 @@ const InventoryModel = {
     } finally {
       connection.release();
     }
+  },
+
+  // ✅ อัปเดตสต็อกเมื่อมีการใช้วัตถุดิบ
+  async updateMaterialStock(material_id, quantity_used) {
+    await db.query(
+      `UPDATE inventory_batches 
+       SET quantity = quantity - ?
+       WHERE material_id = ? 
+       AND quantity > 0
+       ORDER BY expiration_date ASC
+       LIMIT 1`,
+      [quantity_used, material_id]
+    );
   },
 
   // ✅ ลบวัตถุดิบ
