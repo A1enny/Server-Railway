@@ -56,7 +56,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ✅ Routes
 app.use('/', indexRouter);
 app.use('/api/users', usersRouter);
-app.use("/api/materials", materialsRoutes);
 app.use("/api/tables", tableRoutes);
 app.use("/api/shelf_life", shelfLifeRoutes);
 app.use("/api/units", unitRoutes);

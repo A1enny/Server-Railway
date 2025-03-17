@@ -1,27 +1,13 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../config/db");
-const {
-  getMaterials,
-  getMaterialById,
-  addMaterial,
-  addBatchMaterials,
-  deleteMaterial,
-} = require("../controllers/inventoryController");
+const inventoryController = require("../controllers/inventoryController");
 
-// ✅ ดึงข้อมูลวัตถุดิบทั้งหมด (รองรับการค้นหาและกรอง)
-router.get("/", getMaterials);
+module.exports = (io) => {
+    router.get("/", inventoryController.getMaterials);
+    router.get("/:id", inventoryController.getMaterialById);
+    router.post("/", inventoryController.addMaterial);
+    router.post("/batch", inventoryController.addBatchMaterials);
+    router.delete("/:id", inventoryController.deleteMaterial);
 
-// ✅ ดึงข้อมูลวัตถุดิบตาม ID
-router.get("/:id", getMaterialById);
-
-// ✅ เพิ่มวัตถุดิบแบบเดี่ยว
-router.post("/", addMaterial);
-
-// ✅ เพิ่มวัตถุดิบแบบล็อต
-router.post("/batch", addBatchMaterials);
-
-// ✅ ลบวัตถุดิบ
-router.delete("/:id", deleteMaterial);
-
-module.exports = router;
+    return router;
+};
