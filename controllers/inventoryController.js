@@ -45,45 +45,30 @@ exports.getMaterialById = async (req, res) => {
 
 // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
 exports.addMaterial = async (req, res) => {
-  const {
-    name,
-    category_id,
-    quantity,
-    received_date,
-    expiration_date,
-    price,
-    unit,
-  } = req.body;
-  if (
-    !name ||
-    !category_id ||
-    !quantity ||
-    !received_date ||
-    !expiration_date ||
-    !price ||
-    !unit
-  ) {
-    return res.status(400).json({ error: "Missing required fields" });
-  }
-  try {
-    const unit_id = await InventoryModel.getUnitId(unit); // ดึง `unit_id` จากชื่อ unit
-    if (!unit_id) {
-      return res.status(400).json({ error: "Invalid unit" });
+    const {
+      name, category_id, quantity, received_date, expiration_date, price, unit
+    } = req.body;
+  
+    if (!name || !category_id || !quantity || !received_date || !expiration_date || !price || !unit) {
+      return res.status(400).json({ error: "Missing required fields" });
     }
-    const result = await InventoryModel.addMaterial({
-      name,
-      category_id,
-      quantity,
-      received_date,
-      expiration_date,
-      price,
-      unit_id,
-    });
-    res.status(201).json({ success: true, material_id: result.insertId });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to add material" });
-  }
-};
+  
+    try {
+      const unit_id = await InventoryModel.getUnitId(unit);
+      if (!unit_id) {
+        return res.status(400).json({ error: "Invalid unit" });
+      }
+  
+      const result = await InventoryModel.addMaterial({
+        name, category_id, quantity, received_date, expiration_date, price, unit_id
+      });
+  
+      res.status(201).json({ success: true, material_id: result.insertId });
+    } catch (error) {
+      console.error("❌ Error adding material:", error);
+      res.status(500).json({ error: "Failed to add material" });
+    }
+  };  
 
 // ✅ เพิ่มวัตถุดิบแบบล็อต (batch)
 exports.addBatch = async (req, res) => {
@@ -200,11 +185,17 @@ exports.getMostUsedMaterials = async (req, res) => {
       .json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลวัตถุดิบที่ใช้บ่อย" });
   }
 };
+
 exports.getUsageStats = async (req, res) => {
-  try {
-    const stats = await InventoryModel.getUsageStatistics();
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ error: "Error fetching usage stats" });
-  }
-};
+    try {
+      const stats = await InventoryModel.getUsageStatistics();
+      if (!stats) {
+        return res.status(404).json({ error: "No usage stats found" });
+      }
+      res.json({ success: true, stats });
+    } catch (error) {
+      console.error("❌ Error fetching usage stats:", error);
+      res.status(500).json({ error: "Failed to fetch usage stats" });
+    }
+  };
+  

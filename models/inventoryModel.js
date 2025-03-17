@@ -257,4 +257,14 @@ exports.addBatch = async (batchData) => {
   return result;
 };
 
+exports.getUnitId = async (unitName) => {
+  try {
+    const [rows] = await pool.query("SELECT id FROM units WHERE name = ?", [unitName]);
+    return rows.length > 0 ? rows[0].id : null;
+  } catch (error) {
+    console.error("❌ Error fetching unit ID:", error);
+    throw error;
+  }
+};
+
 module.exports = InventoryModel;
