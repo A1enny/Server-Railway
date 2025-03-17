@@ -16,30 +16,20 @@ const InventoryModel = {
         m.material_id, 
         m.name AS material_name, 
         c.category_name, 
-        COALESCE(ib.received_date, m.received_date, 'N/A') AS received_date, 
-        COALESCE(
-          ib.expiration_date, 
-          DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY), 
-          'N/A'
-        ) AS expiration_date, 
+        ib.received_date, 
+        ib.expiration_date, 
         u.unit_name,
-        m.stock AS total_quantity,
+        ib.quantity AS total_quantity,
         CASE 
-          WHEN m.stock <= 0 THEN 'หมด'
-          WHEN m.stock <= m.min_stock THEN 'ต่ำกว่ากำหนด'
-          WHEN COALESCE(ib.expiration_date, 
-            DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY)
-          ) <= CURDATE() THEN 'หมดอายุแล้ว'
-          WHEN COALESCE(ib.expiration_date, 
-            DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY)
-          ) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
+          WHEN ib.quantity <= 0 THEN 'หมด'
+          WHEN ib.expiration_date <= CURDATE() THEN 'หมดอายุแล้ว'
+          WHEN ib.expiration_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
           ELSE 'ปกติ'
         END AS status
       FROM materials m
       LEFT JOIN categories c ON m.category_id = c.category_id
       LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
       LEFT JOIN unit u ON m.unit_id = u.unit_id
-      LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
       WHERE m.name LIKE ? 
         AND (m.category_id = ? OR ? = '%')
       ORDER BY m.material_id ASC
@@ -59,14 +49,71 @@ const InventoryModel = {
     return rows.length > 0 ? rows[0] : null;
   },
 
-  // ✅ เพิ่มวัตถุดิบใหม่
-  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price }) {
+  // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
+  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit }) {
     const [result] = await db.query(
-      `INSERT INTO materials (name, category_id, quantity, received_date, expiration_date, price) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [name, category_id, quantity, received_date, expiration_date, price]
+      `INSERT INTO materials (name, category_id, unit) 
+       VALUES (?, ?, ?) 
+       ON DUPLICATE KEY UPDATE name = VALUES(name)`,
+      [name, category_id, unit]
     );
-    return result.insertId;
+
+    const materialId = result.insertId || (await db.query(`SELECT material_id FROM materials WHERE name = ?`, [name]))[0][0].material_id;
+
+    await db.query(
+      `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
+       VALUES (?, ?, ?, ?, ?)`,
+      [materialId, quantity, received_date, expiration_date, price]
+    );
+
+    return materialId;
+  },
+
+  // ✅ เพิ่มวัตถุดิบแบบล็อต
+  async addBatchMaterials(batch) {
+    if (!Array.isArray(batch) || batch.length === 0) {
+      throw new Error("❌ ไม่มีข้อมูลใน batch");
+    }
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const item of batch) {
+        const { name, category_id, quantity, received_date, expiration_date, price, unit } = item;
+
+        const [existingMaterial] = await connection.query(
+          `SELECT material_id FROM materials WHERE name = ? AND category_id = ?`,
+          [name, category_id]
+        );
+
+        let materialId;
+        if (existingMaterial.length > 0) {
+          materialId = existingMaterial[0].material_id;
+        } else {
+          const [insertResult] = await connection.query(
+            `INSERT INTO materials (name, category_id, unit) VALUES (?, ?, ?)`,
+            [name, category_id, unit]
+          );
+          materialId = insertResult.insertId;
+        }
+
+        await connection.query(
+          `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
+           VALUES (?, ?, ?, ?, ?)`,
+          [materialId, quantity, received_date, expiration_date, price]
+        );
+      }
+
+      await connection.commit();
+      return batch.length;
+    } catch (error) {
+      await connection.rollback();
+      console.error("❌ Error adding batch materials:", error);
+      throw new Error("❌ เพิ่มวัตถุดิบแบบล็อตไม่สำเร็จ");
+    } finally {
+      connection.release();
+    }
   },
 
   // ✅ ลบวัตถุดิบ

@@ -71,3 +71,51 @@ exports.deleteMaterial = async (req, res) => {
     res.status(500).json({ error: "❌ ลบวัตถุดิบไม่สำเร็จ" });
   }
 };
+exports.addMaterial = async (req, res) => {
+    try {
+      const { name, category_id, quantity, received_date, expiration_date, price, unit } = req.body;
+      if (!name || !category_id || !quantity || !expiration_date || !price || !unit) {
+        return res.status(400).json({ error: "❌ กรุณากรอกข้อมูลให้ครบ" });
+      }
+  
+      const materialId = await InventoryModel.addMaterial({
+        name,
+        category_id,
+        quantity,
+        received_date,
+        expiration_date,
+        price,
+        unit,
+      });
+  
+      res.status(201).json({
+        success: true,
+        message: "✅ เพิ่มวัตถุดิบสำเร็จ!",
+        material_id: materialId,
+      });
+    } catch (error) {
+      console.error("❌ Error adding material:", error);
+      res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการเพิ่มวัตถุดิบ" });
+    }
+  };
+  
+  // ✅ เพิ่มวัตถุดิบแบบล็อต (batch)
+  exports.addBatchMaterials = async (req, res) => {
+    try {
+      const { batch } = req.body;
+  
+      if (!Array.isArray(batch) || batch.length === 0) {
+        return res.status(400).json({ error: "❌ กรุณาเพิ่มข้อมูลวัตถุดิบในล็อต" });
+      }
+  
+      const insertedCount = await InventoryModel.addBatchMaterials(batch);
+  
+      res.status(201).json({
+        success: true,
+        message: `✅ เพิ่มวัตถุดิบล็อตสำเร็จ! จำนวน ${insertedCount} รายการ`,
+      });
+    } catch (error) {
+      console.error("❌ Error adding batch materials:", error);
+      res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการเพิ่มวัตถุดิบล็อต" });
+    }
+  };
