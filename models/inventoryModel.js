@@ -16,23 +16,32 @@ const InventoryModel = {
         m.material_id, 
         m.name AS material_name, 
         c.category_name, 
-        ib.received_date, 
-        ib.expiration_date, 
+        COALESCE(ib.received_date, m.received_date, 'N/A') AS received_date, 
+        COALESCE(
+          ib.expiration_date, 
+          DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY), 
+          'N/A'
+        ) AS expiration_date, 
         u.unit_name,
-        SUM(ib.quantity) AS total_quantity,
+        m.stock AS total_quantity,
         CASE 
-          WHEN SUM(ib.quantity) <= 0 THEN 'หมด'
-          WHEN MIN(ib.expiration_date) <= CURDATE() THEN 'หมดอายุแล้ว'
-          WHEN MIN(ib.expiration_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
+          WHEN m.stock <= 0 THEN 'หมด'
+          WHEN m.stock <= m.min_stock THEN 'ต่ำกว่ากำหนด'
+          WHEN COALESCE(ib.expiration_date, 
+            DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY)
+          ) <= CURDATE() THEN 'หมดอายุแล้ว'
+          WHEN COALESCE(ib.expiration_date, 
+            DATE_ADD(COALESCE(ib.received_date, m.received_date), INTERVAL sl.shelf_life_days DAY)
+          ) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
           ELSE 'ปกติ'
         END AS status
       FROM materials m
       LEFT JOIN categories c ON m.category_id = c.category_id
       LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
       LEFT JOIN unit u ON m.unit_id = u.unit_id
+      LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
       WHERE m.name LIKE ? 
         AND (m.category_id = ? OR ? = '%')
-      GROUP BY m.material_id
       ORDER BY m.material_id ASC
       LIMIT ? OFFSET ?`,
       [search, category, category, limit, offset]
