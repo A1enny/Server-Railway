@@ -173,4 +173,45 @@ LIMIT ? OFFSET ?;
   },
 };
 
+// ✅ ดึงข้อมูลล็อตของวัตถุดิบแยกตามการนำเข้า
+exports.getMaterialBatches = async (materialId) => {
+  const [rows] = await db.query(
+    `SELECT batch_id, received_date, expiration_date, quantity 
+     FROM inventory_batches 
+     WHERE material_id = ? 
+     ORDER BY received_date DESC`,
+    [materialId]
+  );
+  return rows;
+};
+
+// ✅ ลบล็อตวัตถุดิบ
+exports.deleteBatch = async (batchId) => {
+  await db.query(`DELETE FROM inventory_batches WHERE batch_id = ?`, [batchId]);
+};
+
+// ✅ อัปเดตสต็อกอัตโนมัติเมื่อมีการใช้งาน
+exports.updateStock = async (material_id, quantity_used) => {
+  const [rows] = await db.query(
+    `UPDATE materials 
+     SET stock = stock - ? 
+     WHERE material_id = ? AND stock >= ?`,
+    [quantity_used, material_id, quantity_used]
+  );
+  return rows.affectedRows > 0;
+};
+
+// ✅ แสดงวัตถุดิบที่ใช้บ่อยที่สุด
+exports.getMostUsedMaterials = async () => {
+  const [rows] = await db.query(
+    `SELECT m.material_id, m.name, SUM(o.quantity_used) as total_used
+     FROM order_items o
+     JOIN materials m ON o.material_id = m.material_id
+     GROUP BY m.material_id
+     ORDER BY total_used DESC
+     LIMIT 10`
+  );
+  return rows;
+};
+
 module.exports = InventoryModel;

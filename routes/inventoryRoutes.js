@@ -9,5 +9,11 @@ module.exports = (io) => {
     router.post("/batch", inventoryController.addBatchMaterials);
     router.delete("/:id", inventoryController.deleteMaterial);
 
+    // ✅ เส้นทางใหม่
+    router.get("/:id/batches", inventoryController.getMaterialBatches); // ดูล็อตของวัตถุดิบ
+    router.delete("/batch/:batchId", inventoryController.deleteBatch); // ลบล็อตวัตถุดิบ
+    router.post("/update-stock", inventoryController.updateStock); // อัปเดตสต็อกอัตโนมัติ
+    router.get("/most-used", inventoryController.getMostUsedMaterials); // ดูวัตถุดิบที่ใช้บ่อยที่สุด
+
     return router;
 };

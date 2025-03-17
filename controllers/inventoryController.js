@@ -105,3 +105,66 @@ exports.deleteMaterial = async (req, res) => {
     res.status(500).json({ error: "❌ ลบวัตถุดิบไม่สำเร็จ" });
   }
 };
+
+// ✅ ดึงล็อตของวัตถุดิบแยกตามการนำเข้า
+exports.getMaterialBatches = async (req, res) => {
+  try {
+    const materialId = req.params.id;
+    const batches = await InventoryModel.getMaterialBatches(materialId);
+
+    if (!batches || batches.length === 0) {
+      return res.status(404).json({ error: "❌ ไม่พบข้อมูลล็อตของวัตถุดิบนี้" });
+    }
+
+    res.json({ success: true, batches });
+  } catch (error) {
+    console.error("❌ Error fetching material batches:", error);
+    res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลล็อตวัตถุดิบ" });
+  }
+};
+
+// ✅ ลบวัตถุดิบแบบล็อต
+exports.deleteBatch = async (req, res) => {
+  try {
+    const batchId = req.params.batchId;
+    await InventoryModel.deleteBatch(batchId);
+
+    res.json({ success: true, message: "✅ ลบล็อตของวัตถุดิบสำเร็จ!" });
+  } catch (error) {
+    console.error("❌ Error deleting batch:", error);
+    res.status(500).json({ error: "❌ ลบล็อตวัตถุดิบไม่สำเร็จ" });
+  }
+};
+
+// ✅ อัปเดตสต็อกอัตโนมัติเมื่อมีการใช้งาน
+exports.updateStock = async (req, res) => {
+  try {
+    const { material_id, quantity_used } = req.body;
+
+    if (!material_id || !quantity_used) {
+      return res.status(400).json({ error: "❌ กรุณาระบุรหัสวัตถุดิบและจำนวนที่ใช้" });
+    }
+
+    const updated = await InventoryModel.updateStock(material_id, quantity_used);
+
+    if (!updated) {
+      return res.status(404).json({ error: "❌ วัตถุดิบไม่พบ หรือสต็อกไม่พอ" });
+    }
+
+    res.json({ success: true, message: "✅ อัปเดตสต็อกสำเร็จ!" });
+  } catch (error) {
+    console.error("❌ Error updating stock:", error);
+    res.status(500).json({ error: "❌ อัปเดตสต็อกไม่สำเร็จ" });
+  }
+};
+
+// ✅ แสดงวัตถุดิบที่ใช้บ่อยที่สุด
+exports.getMostUsedMaterials = async (req, res) => {
+  try {
+    const materials = await InventoryModel.getMostUsedMaterials();
+    res.json({ success: true, materials });
+  } catch (error) {
+    console.error("❌ Error fetching most used materials:", error);
+    res.status(500).json({ error: "❌ เกิดข้อผิดพลาดในการดึงข้อมูลวัตถุดิบที่ใช้บ่อย" });
+  }
+};
