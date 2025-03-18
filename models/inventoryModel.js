@@ -62,57 +62,49 @@ const InventoryModel = {
     return rows.length > 0 ? rows[0] : null;
   },
 
-  async addMaterial(req) {
-    // ⬅️ รับ req แทนการ destructure ตรงๆ
-    console.log("Received data in Backend:", req.body);
-
-    const {
-      name,
-      category_id,
-      quantity,
-      received_date,
-      expiration_date,
-      price,
-      unit,
-    } = req.body;
-
-    // ✅ ตรวจสอบว่ามี unit_id หรือไม่
-    const unitMap = { กรัม: 1, ฟอง: 2, ขวด: 3, แก้ว: 4 };
-    const unit_id = unitMap[unit]; // แปลงชื่อหน่วยเป็น ID
+  async addMaterial({
+    name,
+    category_id,
+    quantity,
+    received_date,
+    expiration_date,
+    price,
+    unit_id,  // ต้องได้รับ unit_id จาก Controller
+}) {
++   console.log("✅ Received unit_id:", unit_id);
 
     if (!unit_id) {
-      console.error("❌ unit_id is missing");
-      throw new Error("❌ unit_id ไม่ถูกต้อง");
+        throw new Error("❌ unit_id ไม่ถูกต้อง หรือไม่ได้รับค่า");
     }
 
     const connection = await db.getConnection();
     try {
-      await connection.beginTransaction();
+        await connection.beginTransaction();
 
-      // ✅ เพิ่มข้อมูลวัตถุดิบลงใน `materials`
-      const [insertResult] = await connection.query(
-        `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
-        [name, category_id, unit_id]
-      );
-      const materialId = insertResult.insertId;
+        // ✅ เพิ่มข้อมูลวัตถุดิบลงใน `materials`
+        const [insertResult] = await connection.query(
+            `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
+            [name, category_id, unit_id]
+        );
+        const materialId = insertResult.insertId;
 
-      // ✅ เพิ่มข้อมูลใน `inventory_batches`
-      await this.addInventoryBatch(connection, {
-        material_id: materialId,
-        quantity,
-        received_date,
-        expiration_date,
-        price,
-      });
+        // ✅ เพิ่มข้อมูลใน `inventory_batches`
+        await this.addInventoryBatch(connection, {
+            material_id: materialId,
+            quantity,
+            received_date,
+            expiration_date,
+            price,
+        });
 
-      await connection.commit();
-      return materialId;
+        await connection.commit();
+        return materialId;
     } catch (error) {
-      await connection.rollback();
-      console.error("❌ Error adding material:", error);
-      throw new Error("❌ เพิ่มวัตถุดิบไม่สำเร็จ");
+        await connection.rollback();
+        console.error("❌ Error adding material:", error);
+        throw new Error("❌ เพิ่มวัตถุดิบไม่สำเร็จ");
     } finally {
-      connection.release();
+        connection.release();
     }
   },
 
