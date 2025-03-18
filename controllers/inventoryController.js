@@ -1,4 +1,4 @@
-const db = require("../config/db"); // ✅ ต้องมีบรรทัดนี้
+const db = require("../config/db");
 const InventoryModel = require("../models/inventoryModel");
 
 // ✅ ดึงข้อมูลวัตถุดิบทั้งหมด (รองรับการค้นหาและกรอง)
@@ -47,36 +47,26 @@ exports.getMaterialById = async (req, res) => {
 // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
 exports.addMaterial = async (req, res) => {
   try {
-    let {
-      name,
-      category_id,
-      quantity,
-      received_date,
-      expiration_date,
-      price,
-      unit,
-    } = req.body;
+    let { name, category_id, quantity, received_date, expiration_date, price, unit } = req.body;
 
-    // ✅ แปลงค่าที่จำเป็นให้เป็นชนิดข้อมูลที่ถูกต้อง
+    // ✅ ตรวจสอบค่าที่รับเข้ามา
     quantity = Number(quantity);
     price = Number(price);
     if (isNaN(quantity) || quantity <= 0 || isNaN(price) || price <= 0) {
-      return res
-        .status(400)
-        .json({ error: "❌ Quantity and Price must be valid numbers" });
+      return res.status(400).json({ error: "❌ Quantity and Price must be valid numbers" });
     }
 
+    // ✅ ถ้าไม่ได้ระบุ received_date ให้ใช้วันที่ปัจจุบัน
+    received_date = received_date || new Date().toISOString().split("T")[0];
+
     // ✅ ดึง unit_id
-    const [unitRow] = await db.query(
-      "SELECT unit_id FROM unit WHERE unit_name = ?",
-      [unit]
-    );
+    const [unitRow] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [unit]);
     if (!unitRow.length) {
       return res.status(400).json({ error: `❌ Unit '${unit}' not found` });
     }
     const unit_id = unitRow[0].unit_id;
 
-    // ✅ คำนวณวันหมดอายุถ้าไม่ได้ระบุมา
+    // ✅ คำนวณวันหมดอายุถ้าไม่ได้ระบุ
     if (!expiration_date) {
       const [shelfLifeRow] = await db.query(
         "SELECT shelf_life_days FROM shelf_life WHERE category_id = ?",
@@ -84,13 +74,10 @@ exports.addMaterial = async (req, res) => {
       );
       if (shelfLifeRow.length > 0) {
         expiration_date = new Date(received_date);
-        expiration_date.setDate(
-          expiration_date.getDate() + shelfLifeRow[0].shelf_life_days
-        );
+        expiration_date.setDate(expiration_date.getDate() + shelfLifeRow[0].shelf_life_days);
+        expiration_date = expiration_date.toISOString().split("T")[0];
       } else {
-        return res
-          .status(400)
-          .json({ error: "❌ Shelf life not found for this category" });
+        return res.status(400).json({ error: "❌ Shelf life not found for this category" });
       }
     }
 
@@ -120,17 +107,10 @@ exports.addBatch = async (req, res) => {
       return res.status(400).json({ error: "❌ Invalid batch data" });
     }
 
+    // ✅ ใช้ Promise.all() เพื่อเร่งประสิทธิภาพ
     const batchData = await Promise.all(
       batch.map(async (item) => {
-        let {
-          name,
-          category_id,
-          quantity,
-          received_date,
-          expiration_date,
-          price,
-          unit,
-        } = item;
+        let { name, category_id, quantity, received_date, expiration_date, price, unit } = item;
 
         // ✅ แปลงค่าให้ถูกต้อง
         quantity = Number(quantity);
@@ -139,17 +119,17 @@ exports.addBatch = async (req, res) => {
           throw new Error("❌ Quantity and Price must be valid numbers");
         }
 
+        // ✅ ถ้าไม่ได้ระบุ received_date ให้ใช้วันที่ปัจจุบัน
+        received_date = received_date || new Date().toISOString().split("T")[0];
+
         // ✅ ดึง unit_id
-        const [unitRow] = await db.query(
-          "SELECT unit_id FROM unit WHERE unit_name = ?",
-          [unit]
-        );
+        const [unitRow] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [unit]);
         if (!unitRow.length) {
           throw new Error(`❌ Unit '${unit}' not found`);
         }
         const unit_id = unitRow[0].unit_id;
 
-        // ✅ คำนวณวันหมดอายุถ้าไม่ได้ระบุมา
+        // ✅ คำนวณวันหมดอายุถ้าไม่ได้ระบุ
         if (!expiration_date) {
           const [shelfLifeRow] = await db.query(
             "SELECT shelf_life_days FROM shelf_life WHERE category_id = ?",
@@ -157,30 +137,19 @@ exports.addBatch = async (req, res) => {
           );
           if (shelfLifeRow.length > 0) {
             expiration_date = new Date(received_date);
-            expiration_date.setDate(
-              expiration_date.getDate() + shelfLifeRow[0].shelf_life_days
-            );
+            expiration_date.setDate(expiration_date.getDate() + shelfLifeRow[0].shelf_life_days);
+            expiration_date = expiration_date.toISOString().split("T")[0];
           } else {
             throw new Error("❌ Shelf life not found for this category");
           }
         }
 
-        return {
-          name,
-          category_id,
-          quantity,
-          received_date,
-          expiration_date,
-          price,
-          unit_id,
-        };
+        return { name, category_id, quantity, received_date, expiration_date, price, unit_id };
       })
     );
 
     await InventoryModel.addBatch(batchData);
-    res
-      .status(201)
-      .json({ success: true, message: "✅ Batch added successfully" });
+    res.status(201).json({ success: true, message: "✅ Batch added successfully" });
   } catch (error) {
     console.error("❌ Error adding batch:", error);
     res.status(500).json({ error: "❌ Failed to add batch" });

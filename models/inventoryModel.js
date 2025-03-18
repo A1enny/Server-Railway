@@ -4,13 +4,15 @@ const InventoryModel = {
   // ✅ ดึงข้อมูลวัตถุดิบพร้อมค้นหา และกรองตามหมวดหมู่
   async getMaterials({ search = "%", category = "%", limit = 10, offset = 0 }) {
     try {
-      console.log("🔍 Fetching materials with search:", search, "category:", category);
+      console.log(
+        "🔍 Fetching materials with search:",
+        search,
+        "category:",
+        category
+      );
 
       const [[{ total }]] = await db.query(
-        `SELECT COUNT(*) AS total 
-         FROM materials 
-         WHERE name LIKE ? 
-         AND (category_id = ? OR ? = '%')`,
+        `SELECT COUNT(*) AS total FROM materials WHERE name LIKE ? AND (category_id = ? OR ? = '%')`,
         [search, category, category]
       );
 
@@ -19,23 +21,15 @@ const InventoryModel = {
           m.material_id, 
           m.name AS material_name, 
           c.category_name, 
-          COALESCE(MIN(ib.received_date), m.received_date, 'N/A') AS received_date, 
-          COALESCE(
-            MIN(ib.expiration_date), 
-            DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY), 
-            'N/A'
-          ) AS expiration_date, 
+          COALESCE(MIN(ib.received_date), CURDATE()) AS received_date, 
+          COALESCE(MIN(ib.expiration_date), DATE_ADD(CURDATE(), INTERVAL sl.shelf_life_days DAY)) AS expiration_date, 
           u.unit_name,
-          SUM(m.stock) AS total_quantity,
+          SUM(ib.quantity) AS total_quantity,
           CASE 
-            WHEN SUM(m.stock) <= 0 THEN 'หมด'
-            WHEN SUM(m.stock) <= m.min_stock THEN 'ต่ำกว่ากำหนด'
-            WHEN COALESCE(MIN(ib.expiration_date), 
-              DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
-            ) <= CURDATE() THEN 'หมดอายุแล้ว'
-            WHEN COALESCE(MIN(ib.expiration_date), 
-              DATE_ADD(COALESCE(MIN(ib.received_date), m.received_date), INTERVAL sl.shelf_life_days DAY)
-            ) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
+            WHEN SUM(ib.quantity) <= 0 THEN 'หมด'
+            WHEN SUM(ib.quantity) <= m.min_stock THEN 'ต่ำกว่ากำหนด'
+            WHEN MIN(ib.expiration_date) <= CURDATE() THEN 'หมดอายุแล้ว'
+            WHEN MIN(ib.expiration_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
             ELSE 'ปกติ'
           END AS status
         FROM materials m
@@ -43,9 +37,8 @@ const InventoryModel = {
         LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
         LEFT JOIN unit u ON m.unit_id = u.unit_id
         LEFT JOIN shelf_life sl ON m.category_id = sl.category_id
-        WHERE m.name LIKE ? 
-          AND (m.category_id = ? OR ? = '%')
-        GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.received_date, m.min_stock, sl.shelf_life_days
+        WHERE m.name LIKE ? AND (m.category_id = ? OR ? = '%')
+        GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.min_stock, sl.shelf_life_days
         ORDER BY m.material_id ASC
         LIMIT ? OFFSET ?;`,
         [search, category, category, limit, offset]
@@ -83,9 +76,17 @@ const InventoryModel = {
     }
   },
 
-  // ✅ เพิ่มวัตถุดิบใหม่
-  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit_id }) {
-    console.log("✅ Received unit_id:", unit_id);
+  // ✅ เพิ่มวัตถุดิบใหม่ (แบบเดี่ยว)
+  async addMaterial({
+    name,
+    category_id,
+    quantity,
+    received_date,
+    expiration_date,
+    price,
+    unit_id,
+  }) {
+    console.log("✅ Adding material with unit_id:", unit_id);
 
     if (!unit_id) {
       throw new Error("❌ unit_id ไม่ถูกต้อง หรือไม่ได้รับค่า");
@@ -102,7 +103,7 @@ const InventoryModel = {
       );
       const materialId = insertResult.insertId;
 
-      // ✅ เพิ่มข้อมูลลงใน `inventory_batches`
+      // ✅ เพิ่มล็อตแรกใน `inventory_batches`
       await this.addInventoryBatch(connection, {
         material_id: materialId,
         quantity,
@@ -123,27 +124,88 @@ const InventoryModel = {
     }
   },
 
-  // ✅ เพิ่มล็อตของวัตถุดิบ
-  async addInventoryBatch(connection, { material_id, quantity, received_date, expiration_date, price }) {
+  // ✅ เพิ่มล็อตของวัตถุดิบ (batch)
+  async addBatch(batchData) {
+    const connection = await db.getConnection();
     try {
-      console.log("📝 Adding to inventory_batches:", {
-        material_id,
-        quantity,
-        received_date,
-        expiration_date,
-        price,
-      });
+      await connection.beginTransaction();
+      const batchNumber = `BATCH-${Date.now()}`;
 
-      await connection.query(
-        `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
-         VALUES (?, ?, ?, ?, ?)`,
-        [material_id, quantity, received_date, expiration_date, price]
-      );
+      for (const item of batchData) {
+        let {
+          name,
+          category_id,
+          quantity,
+          received_date,
+          expiration_date,
+          price,
+          unit_id,
+        } = item;
 
-      console.log("✅ Inventory batch added successfully");
+        quantity = Number(quantity);
+        price = Number(price);
+        if (isNaN(quantity) || isNaN(price)) {
+          throw new Error("❌ Quantity และ Price ต้องเป็นตัวเลขที่ถูกต้อง");
+        }
+
+        received_date = received_date || new Date().toISOString().split("T")[0];
+
+        const [existingMaterial] = await connection.query(
+          `SELECT material_id FROM materials WHERE name = ? AND category_id = ? AND unit_id = ?`,
+          [name, category_id, unit_id]
+        );
+
+        let materialId =
+          existingMaterial.length > 0 ? existingMaterial[0].material_id : null;
+
+        if (!materialId) {
+          const [insertResult] = await connection.query(
+            `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
+
+            [name, category_id, unit_id]
+          );
+          materialId = insertResult.insertId;
+        }
+
+        if (!expiration_date) {
+          const [shelfLifeRow] = await connection.query(
+            `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
+            [category_id]
+          );
+          if (shelfLifeRow.length > 0) {
+            expiration_date = new Date(received_date);
+            expiration_date.setDate(
+              expiration_date.getDate() + shelfLifeRow[0].shelf_life_days
+            );
+            expiration_date = expiration_date.toISOString().split("T")[0];
+          } else {
+            expiration_date = null;
+          }
+        }
+
+        await connection.query(
+          `INSERT INTO inventory_batches (material_id, batch_number, quantity, received_date, expiration_date, price) 
+         VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            materialId,
+            batchNumber,
+            quantity,
+            received_date,
+            expiration_date,
+            price,
+          ]
+        );
+      }
+
+      await connection.commit();
+      console.log("✅ Batch added successfully:", batchNumber);
+      return batchNumber;
     } catch (error) {
-      console.error("❌ Error adding inventory batch:", error);
-      throw new Error("❌ ไม่สามารถเพิ่มข้อมูลลงใน inventory_batches ได้");
+      await connection.rollback();
+      console.error("❌ Error adding batch:", error);
+      throw new Error("❌ เพิ่มล็อตวัตถุดิบไม่สำเร็จ");
+    } finally {
+      connection.release();
     }
   },
 
@@ -151,22 +213,21 @@ const InventoryModel = {
   async getUnitId(unitName) {
     try {
       console.log(`🔍 Searching for unit_id of '${unitName}'...`);
-
-      const [rows] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [unitName]);
+      const [rows] = await db.query(
+        "SELECT unit_id FROM unit WHERE unit_name = ?",
+        [unitName]
+      );
 
       if (rows.length === 0) {
-        console.error(`❌ Unit '${unitName}' not found in database`);
         throw new Error(`❌ ไม่พบหน่วย '${unitName}' ในฐานข้อมูล`);
       }
 
-      console.log(`✅ Found unit_id: ${rows[0].unit_id} for unit '${unitName}'`);
       return rows[0].unit_id;
     } catch (error) {
       console.error("❌ Error fetching unit_id:", error);
       throw new Error("❌ ไม่สามารถดึงข้อมูล unit_id ได้");
     }
   },
-
   // ✅ ลบวัตถุดิบ
   async deleteMaterial(id) {
     try {
@@ -204,7 +265,9 @@ const InventoryModel = {
   async deleteBatch(batchId) {
     try {
       console.log(`🗑️ Deleting batch ID: ${batchId}`);
-      await db.query("DELETE FROM inventory_batches WHERE batch_id = ?", [batchId]);
+      await db.query("DELETE FROM inventory_batches WHERE batch_id = ?", [
+        batchId,
+      ]);
       console.log("✅ Batch deleted successfully");
     } catch (error) {
       console.error("❌ Error deleting batch:", error);
