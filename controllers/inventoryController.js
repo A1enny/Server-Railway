@@ -8,7 +8,9 @@ exports.getMaterials = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     const search = req.query.search ? `%${req.query.search}%` : "%";
-    const category = req.query.category || "%";
+    const category = req.query.category || null;
+
+    console.log(`🔍 Fetching materials... Search: ${search}, Category: ${category}`);
 
     const { total, rows } = await InventoryModel.getMaterials({
       search,

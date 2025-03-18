@@ -10,14 +10,14 @@ const InventoryModel = {
   }) {
     try {
       console.log("🔍 Fetching materials with batches...");
-  
+
       const searchValue = `%${search}%`;
-  
+
       const [[{ total }]] = await db.query(
         `SELECT COUNT(*) AS total FROM materials WHERE name LIKE ? AND (? IS NULL OR category_id = ?)`,
         [searchValue, category, category]
       );
-  
+
       const [rows] = await db.query(
         `SELECT 
           m.material_id, 
@@ -56,11 +56,15 @@ const InventoryModel = {
         LIMIT ? OFFSET ?;`,
         [searchValue, category, category, limit, offset]
       );
-  
-      // ✅ ตรวจสอบว่า `batches` เป็น string หรือไม่
+
+      // ✅ ตรวจสอบ JSON ก่อน parse
       rows.forEach((row) => {
         try {
-          if (typeof row.batches === "string" && row.batches.trim().startsWith("[") && row.batches.trim().endsWith("]")) {
+          if (
+            typeof row.batches === "string" &&
+            row.batches.trim().startsWith("[") &&
+            row.batches.trim().endsWith("]")
+          ) {
             row.batches = JSON.parse(row.batches);
           } else {
             row.batches = [];
@@ -70,7 +74,7 @@ const InventoryModel = {
           row.batches = [];
         }
       });
-  
+
       console.log("✅ Materials with batches retrieved successfully");
       return { total, rows };
     } catch (error) {
