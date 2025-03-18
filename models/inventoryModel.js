@@ -190,7 +190,7 @@ const InventoryModel = {
     }
   
     return rows[0].unit_id;
-  },
+  },  
   
   // ✅ แสดงวัตถุดิบที่ใช้บ่อยที่สุด
   async getMostUsedMaterials() {
