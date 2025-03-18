@@ -271,64 +271,6 @@ const InventoryModel = {
       throw new Error("❌ ไม่สามารถลบวัตถุดิบได้");
     }
   },
-
-  // ✅ ดึงข้อมูลล็อตของวัตถุดิบ
-  async getMaterials({ search = "%", category = "%", limit = 10, offset = 0 }) {
-    try {
-      console.log("🔍 Fetching materials with batches...");
-
-      const [[{ total }]] = await db.query(
-        `SELECT COUNT(*) AS total FROM materials WHERE name LIKE ? AND (category_id = ? OR ? = '%')`,
-        [search, category, category]
-      );
-
-      const [rows] = await db.query(
-        `SELECT 
-            m.material_id, 
-            m.name AS material_name, 
-            c.category_name, 
-            u.unit_name,
-            COALESCE(SUM(ib.quantity), 0) AS total_quantity,
-            CASE 
-                WHEN SUM(ib.quantity) <= 0 THEN 'หมด'
-                WHEN SUM(ib.quantity) <= m.min_stock THEN 'ต่ำกว่ากำหนด'
-                WHEN MIN(ib.expiration_date) <= CURDATE() THEN 'หมดอายุแล้ว'
-                WHEN MIN(ib.expiration_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 'ใกล้หมดอายุ'
-                ELSE 'ปกติ'
-            END AS status,
-            JSON_ARRAYAGG(
-                JSON_OBJECT(
-                    'batch_id', ib.batch_id,
-                    'batch_number', ib.batch_number,
-                    'received_date', ib.received_date,
-                    'expiration_date', ib.expiration_date,
-                    'quantity', ib.quantity,
-                    'price', ib.price
-                )
-            ) AS batches
-        FROM materials m
-        LEFT JOIN categories c ON m.category_id = c.category_id
-        LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
-        LEFT JOIN unit u ON m.unit_id = u.unit_id
-        WHERE m.name LIKE ? AND (m.category_id = ? OR ? = '%')
-        GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.min_stock
-        ORDER BY m.material_id ASC
-        LIMIT ? OFFSET ?;`,
-        [search, category, category, limit, offset]
-      );
-
-      // ✅ แปลง JSON ที่ดึงมาจาก MySQL ให้เป็น JavaScript Object
-      rows.forEach((row) => {
-        row.batches = JSON.parse(row.batches || "[]");
-      });
-
-      console.log("✅ Materials with batches retrieved successfully");
-      return { total, rows };
-    } catch (error) {
-      console.error("❌ Error fetching materials with batches:", error);
-      throw new Error("❌ ไม่สามารถดึงข้อมูลวัตถุดิบพร้อมล็อตได้");
-    }
-  },
 };
 
 module.exports = InventoryModel;
