@@ -54,16 +54,14 @@ const InventoryModel = {
         try {
           if (typeof row.batches === "string") {
             row.batches = JSON.parse(row.batches);
-          } else if (typeof row.batches === "object" && row.batches !== null) {
-            row.batches = [row.batches]; // ✅ ถ้าค่ามาเป็น object เดี่ยว ๆ ให้ห่อเป็น array
-          } else {
-            row.batches = []; // ✅ ถ้า `batches` เป็น `null` หรือไม่ใช่ JSON ที่ถูกต้อง, ให้เป็น array ว่าง
+          } else if (!Array.isArray(row.batches)) {
+            row.batches = [];
           }
         } catch (error) {
           console.error("❌ JSON parse error for batches:", row.batches);
           row.batches = [];
         }
-      });           
+      });               
 
       console.log("✅ Materials with batches retrieved successfully");
       return { total, rows };
