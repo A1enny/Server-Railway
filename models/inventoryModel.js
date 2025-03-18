@@ -73,7 +73,6 @@ const InventoryModel = {
     }
   },
 
-
   // ✅ ดึงข้อมูลวัตถุดิบตาม ID
   async getMaterialById(id) {
     try {
