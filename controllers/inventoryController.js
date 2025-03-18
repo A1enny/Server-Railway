@@ -60,7 +60,7 @@ exports.addMaterial = async (req, res) => {
       if (!unitRow.length) {
           return res.status(400).json({ error: `❌ Unit '${unit}' not found` });
       }
-      const unit_id = unitRow[0].unit_id; // ✅ กำหนดค่า unit_id ก่อนใช้งาน
+      const unit_id = unitRow[0].unit_id; // ✅ กำหนดค่า unit_id
 
       let finalExpirationDate = expiration_date;
 
@@ -88,7 +88,7 @@ exports.addMaterial = async (req, res) => {
       console.error("❌ Error adding material:", error);
       res.status(500).json({ error: "❌ Failed to add material" });
   }
-};   
+};
 
 // ✅ เพิ่มวัตถุดิบแบบล็อต (batch)
 exports.addBatch = async (req, res) => {
@@ -101,12 +101,12 @@ exports.addBatch = async (req, res) => {
   try {
       const batchData = await Promise.all(
           batch.map(async (item) => {
-              // ✅ ดึง unit_id จากชื่อหน่วย
+              // ✅ ดึง unit_id
               const [unitRow] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [item.unit]);
               if (!unitRow.length) {
                   throw new Error(`❌ Unit '${item.unit}' not found`);
               }
-              const unit_id = unitRow[0].unit_id; // ✅ กำหนดค่า unit_id
+              const unit_id = unitRow[0].unit_id;
 
               let finalExpirationDate = item.expiration_date;
 
@@ -131,7 +131,7 @@ exports.addBatch = async (req, res) => {
                   received_date: item.received_date,
                   expiration_date: finalExpirationDate,
                   price: item.price,
-                  unit_id: unit_id, // ✅ กำหนด unit_id
+                  unit_id: unit_id,
               };
           })
       );
