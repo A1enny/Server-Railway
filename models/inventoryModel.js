@@ -26,21 +26,18 @@ const InventoryModel = {
           ELSE 'ปกติ'
       END AS status,
       COALESCE(
-          JSON_ARRAYAGG(
-              IF(ib.batch_id IS NOT NULL, 
-                  JSON_OBJECT(
-                      'batch_id', ib.batch_id,
-                      'batch_number', ib.batch_number,
-                      'received_date', ib.received_date,
-                      'expiration_date', ib.expiration_date,
-                      'quantity', ib.quantity,
-                      'price', ib.price
-                  ),
-                  NULL
-              )
-          ),
-          '[]'
-      ) AS batches
+    JSON_ARRAYAGG(
+        JSON_OBJECT(
+            'batch_id', ib.batch_id,
+            'batch_number', ib.batch_number,
+            'received_date', ib.received_date,
+            'expiration_date', ib.expiration_date,
+            'quantity', ib.quantity,
+            'price', ib.price
+        )
+    ),
+    '[]'
+) AS batches
   FROM materials m
   LEFT JOIN categories c ON m.category_id = c.category_id
   LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
@@ -54,10 +51,15 @@ const InventoryModel = {
 
       // ✅ ตรวจสอบว่าค่า `batches` ที่ส่งมาจาก MySQL เป็น string หรือไม่
       rows.forEach((row) => {
-        if (typeof row.batches === "string") {
-          row.batches = JSON.parse(row.batches); // ✅ ถ้าเป็น string, ให้แปลงเป็น Object
-        } else if (!Array.isArray(row.batches)) {
-          row.batches = []; // ✅ ถ้า `batches` ไม่ใช่ array, ให้เซ็ตเป็น `[]`
+        try {
+          if (typeof row.batches === "string") {
+            row.batches = JSON.parse(row.batches); // ✅ ถ้าเป็น string, ให้แปลงเป็น Object
+          } else if (!Array.isArray(row.batches)) {
+            row.batches = []; // ✅ ถ้า `batches` ไม่ใช่ array, ให้เซ็ตเป็น `[]`
+          }
+        } catch (error) {
+          console.error("❌ JSON parse error for batches:", row.batches);
+          row.batches = [];
         }
       });
 
