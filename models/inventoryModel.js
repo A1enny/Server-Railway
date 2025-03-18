@@ -62,16 +62,29 @@ const InventoryModel = {
     return rows.length > 0 ? rows[0] : null;
   },
 
-  // ✅ ฟังก์ชันเพิ่มวัถุดิบแบบเดี่ยว
-  async addMaterial({
-    name,
-    category_id,
-    quantity,
-    received_date,
-    expiration_date,
-    price,
-    unit_id,
-  }) {
+  async addMaterial(req) {
+    // ⬅️ รับ req แทนการ destructure ตรงๆ
+    console.log("Received data in Backend:", req.body);
+
+    const {
+      name,
+      category_id,
+      quantity,
+      received_date,
+      expiration_date,
+      price,
+      unit,
+    } = req.body;
+
+    // ✅ ตรวจสอบว่ามี unit_id หรือไม่
+    const unitMap = { กรัม: 1, ฟอง: 2, ขวด: 3, แก้ว: 4 };
+    const unit_id = unitMap[unit]; // แปลงชื่อหน่วยเป็น ID
+
+    if (!unit_id) {
+      console.error("❌ unit_id is missing");
+      throw new Error("❌ unit_id ไม่ถูกต้อง");
+    }
+
     const connection = await db.getConnection();
     try {
       await connection.beginTransaction();
@@ -102,107 +115,99 @@ const InventoryModel = {
       connection.release();
     }
   },
-  // ✅ ฟังก์ชันเพิ่มวัตถุดิบแบบล็อต
-  async addBatchMaterials(batch) {
-    if (!Array.isArray(batch) || batch.length === 0) {
-      throw new Error("❌ ไม่มีข้อมูลใน batch");
-    }
 
-    const connection = await db.getConnection();
-    try {
-      await connection.beginTransaction();
-
-      for (const item of batch) {
-        const {
-          name,
-          category_id,
-          quantity,
-          received_date,
-          expiration_date,
-          price,
-          unit_id,
-        } = item;
-
-        // ✅ เพิ่มข้อมูลวัตถุดิบลงใน `materials`
-        const [insertResult] = await connection.query(
-          `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
-          [name, category_id, unit_id]
-        );
-        const materialId = insertResult.insertId;
-
-        // ✅ เพิ่มข้อมูลใน `inventory_batches`
-        await this.addInventoryBatch(connection, {
-          material_id: materialId,
-          quantity,
-          received_date,
-          expiration_date,
-          price,
-        });
-      }
-
-      await connection.commit();
-      return batch.length;
-    } catch (error) {
-      await connection.rollback();
-      console.error("❌ Error adding batch materials:", error);
-      throw new Error("❌ เพิ่มวัตถุดิบแบบล็อตไม่สำเร็จ");
-    } finally {
-      connection.release();
-    }
-  },
-
-  // ✅ ฟังก์ชันแยกเพิ่ม `inventory_batches`
+  /// ✅ ฟังก์ชันแยกเพิ่ม `inventory_batches` พร้อมจัดการข้อผิดพลาด
   async addInventoryBatch(
     connection,
     { material_id, quantity, received_date, expiration_date, price }
   ) {
-    await connection.query(
-      `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
-     VALUES (?, ?, ?, ?, ?)`,
-      [material_id, quantity, received_date, expiration_date, price]
-    );
-  },
-  // ✅ ดึงข้อมูลการใช้งานวัตถุดิบ
-  async getUsageStatistics() {
     try {
-      const [rows] = await db.query(`
-        SELECT material_id, SUM(quantity_used) as total_used
-        FROM usage_logs
-        GROUP BY material_id
-        ORDER BY total_used DESC
-      `);
-      return rows;
+      console.log("📝 Adding to inventory_batches:", {
+        material_id,
+        quantity,
+        received_date,
+        expiration_date,
+        price,
+      });
+
+      await connection.query(
+        `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
+       VALUES (?, ?, ?, ?, ?)`,
+        [material_id, quantity, received_date, expiration_date, price]
+      );
+
+      console.log("✅ Inventory batch added successfully");
     } catch (error) {
-      console.error("❌ Error fetching usage statistics:", error);
-      throw error;
+      console.error("❌ Error adding inventory batch:", error);
+      throw new Error("❌ ไม่สามารถเพิ่มข้อมูลลงใน inventory_batches ได้");
     }
   },
 
-  // ✅ ดึง unit_id จากชื่อหน่วย
-  async getUnitId(unitName) {
-    const [rows] = await db.query(
-      "SELECT unit_id FROM unit WHERE unit_name = ?",
-      [unitName]
-    );
-  
-    if (rows.length === 0) {
-      throw new Error(`❌ Unit '${unitName}' not found in database`);
+  // ✅ ดึงข้อมูลการใช้งานวัตถุดิบ
+  async getUsageStatistics() {
+    try {
+      console.log("📊 Fetching usage statistics...");
+
+      const [rows] = await db.query(`
+      SELECT material_id, SUM(quantity_used) AS total_used
+      FROM usage_logs
+      GROUP BY material_id
+      ORDER BY total_used DESC
+    `);
+
+      console.log("✅ Usage statistics retrieved:", rows);
+      return rows;
+    } catch (error) {
+      console.error("❌ Error fetching usage statistics:", error);
+      throw new Error("❌ ไม่สามารถดึงข้อมูลสถิติการใช้งานได้");
     }
-  
-    return rows[0].unit_id;
-  },  
-  
-  // ✅ แสดงวัตถุดิบที่ใช้บ่อยที่สุด
+  },
+
+  // ✅ ดึง unit_id จากชื่อหน่วย (ปรับปรุงให้ใช้ cache)
+  async getUnitId(unitName) {
+    try {
+      console.log(`🔍 Searching for unit_id of '${unitName}'...`);
+
+      const [rows] = await db.query(
+        "SELECT unit_id FROM unit WHERE unit_name = ?",
+        [unitName]
+      );
+
+      if (rows.length === 0) {
+        console.error(`❌ Unit '${unitName}' not found in database`);
+        throw new Error(`❌ ไม่พบหน่วย '${unitName}' ในฐานข้อมูล`);
+      }
+
+      console.log(
+        `✅ Found unit_id: ${rows[0].unit_id} for unit '${unitName}'`
+      );
+      return rows[0].unit_id;
+    } catch (error) {
+      console.error("❌ Error fetching unit_id:", error);
+      throw new Error("❌ ไม่สามารถดึงข้อมูล unit_id ได้");
+    }
+  },
+
+  // ✅ แสดงวัตถุดิบที่ใช้บ่อยที่สุด (รองรับกรณีไม่มีข้อมูล)
   async getMostUsedMaterials() {
-    const [rows] = await db.query(`
-      SELECT m.material_id, m.name, SUM(o.quantity_used) as total_used
-      FROM order_items o
-      JOIN materials m ON o.material_id = m.material_id
+    try {
+      console.log("📌 Fetching most used materials...");
+
+      const [rows] = await db.query(`
+      SELECT m.material_id, m.name, COALESCE(SUM(o.quantity_used), 0) AS total_used
+      FROM materials m
+      LEFT JOIN order_items o ON o.material_id = m.material_id
       GROUP BY m.material_id
       ORDER BY total_used DESC
       LIMIT 10
     `);
-    return rows;
+
+      console.log("✅ Most used materials retrieved:", rows);
+      return rows;
+    } catch (error) {
+      console.error("❌ Error fetching most used materials:", error);
+      throw new Error("❌ ไม่สามารถดึงข้อมูลวัตถุดิบที่ใช้บ่อยที่สุดได้");
+    }
   },
 
   // ✅ ลบวัตถุดิบ
