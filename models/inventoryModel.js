@@ -62,24 +62,47 @@ const InventoryModel = {
     return rows.length > 0 ? rows[0] : null;
   },
 
-  // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
-  async addMaterial({ name, category_id, quantity, received_date, expiration_date, price, unit_id }) {
-    const [insertResult] = await db.query(
-      `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
-      [name, category_id, unit_id]
-    );
-    const materialId = insertResult.insertId;
+  // ✅ ฟังก์ชันเพิ่มวัถุดิบแบบเดี่ยว
+  async addMaterial({
+    name,
+    category_id,
+    quantity,
+    received_date,
+    expiration_date,
+    price,
+    unit_id,
+  }) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
 
-    await db.query(
-      `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [materialId, quantity, received_date, expiration_date, price]
-    );
+      // ✅ เพิ่มข้อมูลวัตถุดิบลงใน `materials`
+      const [insertResult] = await connection.query(
+        `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
+        [name, category_id, unit_id]
+      );
+      const materialId = insertResult.insertId;
 
-    return materialId;
+      // ✅ เพิ่มข้อมูลใน `inventory_batches`
+      await this.addInventoryBatch(connection, {
+        material_id: materialId,
+        quantity,
+        received_date,
+        expiration_date,
+        price,
+      });
+
+      await connection.commit();
+      return materialId;
+    } catch (error) {
+      await connection.rollback();
+      console.error("❌ Error adding material:", error);
+      throw new Error("❌ เพิ่มวัตถุดิบไม่สำเร็จ");
+    } finally {
+      connection.release();
+    }
   },
-
-  // ✅ เพิ่มวัตถุดิบแบบล็อต
+  // ✅ ฟังก์ชันเพิ่มวัตถุดิบแบบล็อต
   async addBatchMaterials(batch) {
     if (!Array.isArray(batch) || batch.length === 0) {
       throw new Error("❌ ไม่มีข้อมูลใน batch");
@@ -90,19 +113,31 @@ const InventoryModel = {
       await connection.beginTransaction();
 
       for (const item of batch) {
-        const { name, category_id, quantity, received_date, expiration_date, price, unit_id } = item;
+        const {
+          name,
+          category_id,
+          quantity,
+          received_date,
+          expiration_date,
+          price,
+          unit_id,
+        } = item;
 
+        // ✅ เพิ่มข้อมูลวัตถุดิบลงใน `materials`
         const [insertResult] = await connection.query(
           `INSERT INTO materials (name, category_id, unit_id) VALUES (?, ?, ?)`,
           [name, category_id, unit_id]
         );
         const materialId = insertResult.insertId;
 
-        await connection.query(
-          `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
-           VALUES (?, ?, ?, ?, ?)`,
-          [materialId, quantity, received_date, expiration_date, price]
-        );
+        // ✅ เพิ่มข้อมูลใน `inventory_batches`
+        await this.addInventoryBatch(connection, {
+          material_id: materialId,
+          quantity,
+          received_date,
+          expiration_date,
+          price,
+        });
       }
 
       await connection.commit();
@@ -116,6 +151,17 @@ const InventoryModel = {
     }
   },
 
+  // ✅ ฟังก์ชันแยกเพิ่ม `inventory_batches`
+  async addInventoryBatch(
+    connection,
+    { material_id, quantity, received_date, expiration_date, price }
+  ) {
+    await connection.query(
+      `INSERT INTO inventory_batches (material_id, quantity, received_date, expiration_date, price) 
+     VALUES (?, ?, ?, ?, ?)`,
+      [material_id, quantity, received_date, expiration_date, price]
+    );
+  },
   // ✅ ดึงข้อมูลการใช้งานวัตถุดิบ
   async getUsageStatistics() {
     try {
@@ -134,7 +180,10 @@ const InventoryModel = {
 
   // ✅ ดึง unit_id จากชื่อหน่วย
   async getUnitId(unitName) {
-    const [rows] = await db.query("SELECT unit_id FROM units WHERE unit_name = ?", [unitName]);
+    const [rows] = await db.query(
+      "SELECT unit_id FROM units WHERE unit_name = ?",
+      [unitName]
+    );
     return rows.length > 0 ? rows[0].unit_id : null;
   },
 
@@ -159,7 +208,8 @@ const InventoryModel = {
 
   // ✅ ดึงข้อมูลล็อตของวัตถุดิบ
   async getMaterialBatches(materialId) {
-    const [rows] = await db.query(`
+    const [rows] = await db.query(
+      `
       SELECT batch_id, received_date, expiration_date, quantity 
       FROM inventory_batches 
       WHERE material_id = ? 
@@ -171,8 +221,10 @@ const InventoryModel = {
 
   // ✅ ลบล็อตวัตถุดิบ
   async deleteBatch(batchId) {
-    await db.query(`DELETE FROM inventory_batches WHERE batch_id = ?`, [batchId]);
-  }
+    await db.query(`DELETE FROM inventory_batches WHERE batch_id = ?`, [
+      batchId,
+    ]);
+  },
 };
 
 module.exports = InventoryModel;
