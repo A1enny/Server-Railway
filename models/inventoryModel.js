@@ -28,12 +28,12 @@ const InventoryModel = {
       COALESCE(
     JSON_ARRAYAGG(
         JSON_OBJECT(
-            'batch_id', ib.batch_id,
-            'batch_number', ib.batch_number,
-            'received_date', ib.received_date,
-            'expiration_date', ib.expiration_date,
-            'quantity', ib.quantity,
-            'price', ib.price
+            'batch_id', IFNULL(ib.batch_id, 0),
+            'batch_number', IFNULL(ib.batch_number, ''),
+            'received_date', IFNULL(ib.received_date, ''),
+            'expiration_date', IFNULL(ib.expiration_date, ''),
+            'quantity', IFNULL(ib.quantity, 0),
+            'price', IFNULL(ib.price, 0)
         )
     ),
     '[]'
@@ -53,15 +53,17 @@ const InventoryModel = {
       rows.forEach((row) => {
         try {
           if (typeof row.batches === "string") {
-            row.batches = JSON.parse(row.batches); // ✅ ถ้าเป็น string, ให้แปลงเป็น Object
-          } else if (!Array.isArray(row.batches)) {
-            row.batches = []; // ✅ ถ้า `batches` ไม่ใช่ array, ให้เซ็ตเป็น `[]`
+            row.batches = JSON.parse(row.batches);
+          } else if (typeof row.batches === "object" && row.batches !== null) {
+            row.batches = [row.batches]; // ✅ ถ้าค่ามาเป็น object เดี่ยว ๆ ให้ห่อเป็น array
+          } else {
+            row.batches = []; // ✅ ถ้า `batches` เป็น `null` หรือไม่ใช่ JSON ที่ถูกต้อง, ให้เป็น array ว่าง
           }
         } catch (error) {
           console.error("❌ JSON parse error for batches:", row.batches);
           row.batches = [];
         }
-      });
+      });           
 
       console.log("✅ Materials with batches retrieved successfully");
       return { total, rows };
