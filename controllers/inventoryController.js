@@ -1,3 +1,4 @@
+const db = require("../config/db"); // ✅ ต้องมีบรรทัดนี้
 const InventoryModel = require("../models/inventoryModel");
 
 // ✅ ดึงข้อมูลวัตถุดิบทั้งหมด (รองรับการค้นหาและกรอง)
