@@ -46,98 +46,103 @@ exports.getMaterialById = async (req, res) => {
 
 // ✅ เพิ่มวัตถุดิบแบบเดี่ยว
 exports.addMaterial = async (req, res) => {
-    const {
+  const {
       name, category_id, quantity, received_date, expiration_date, price, unit
-    } = req.body;
-  
-    if (!name || !category_id || !quantity || !received_date || !price || !unit) {
+  } = req.body;
+
+  if (!name || !category_id || !quantity || !received_date || !price || !unit) {
       return res.status(400).json({ error: "❌ Missing required fields" });
-    }
-  
-    try {
-      const getUnitId = async (unitName) => {
-        const [rows] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [unitName]);
-        return rows.length ? rows[0].unit_id : null;
-      };
-      
-  
-      let finalExpirationDate = expiration_date;
-  
-      // ✅ ถ้าไม่ได้ระบุวันหมดอายุ ให้คำนวณจาก shelf_life
-      if (!expiration_date) {
-        const [shelfLifeRow] = await db.query(
-          `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
-          [category_id]
-        );
-        if (shelfLifeRow.length > 0) {
-          finalExpirationDate = new Date(received_date);
-          finalExpirationDate.setDate(finalExpirationDate.getDate() + shelfLifeRow[0].shelf_life_days);
-        } else {
-          return res.status(400).json({ error: "❌ Shelf life not found for this category" });
-        }
+  }
+
+  try {
+      // ✅ ดึง unit_id จากชื่อหน่วย
+      const [unitRow] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [unit]);
+      if (!unitRow.length) {
+          return res.status(400).json({ error: `❌ Unit '${unit}' not found` });
       }
-  
+      const unit_id = unitRow[0].unit_id; // ✅ กำหนดค่า unit_id ก่อนใช้งาน
+
+      let finalExpirationDate = expiration_date;
+
+      // ✅ คำนวณวันหมดอายุถ้าไม่ได้ระบุมา
+      if (!expiration_date) {
+          const [shelfLifeRow] = await db.query(
+              `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
+              [category_id]
+          );
+          if (shelfLifeRow.length > 0) {
+              finalExpirationDate = new Date(received_date);
+              finalExpirationDate.setDate(finalExpirationDate.getDate() + shelfLifeRow[0].shelf_life_days);
+          } else {
+              return res.status(400).json({ error: "❌ Shelf life not found for this category" });
+          }
+      }
+
+      // ✅ ส่ง unit_id ไปกับข้อมูล
       const result = await InventoryModel.addMaterial({
-        name, category_id, quantity, received_date, expiration_date: finalExpirationDate, price, unit_id
+          name, category_id, quantity, received_date, expiration_date: finalExpirationDate, price, unit_id
       });
-  
+
       res.status(201).json({ success: true, material_id: result.insertId });
-    } catch (error) {
+  } catch (error) {
       console.error("❌ Error adding material:", error);
       res.status(500).json({ error: "❌ Failed to add material" });
-    }
-  };
-    
+  }
+};   
 
 // ✅ เพิ่มวัตถุดิบแบบล็อต (batch)
 exports.addBatch = async (req, res) => {
-    const { batch } = req.body;
-    
-    if (!batch || !Array.isArray(batch) || batch.length === 0) {
+  const { batch } = req.body;
+
+  if (!batch || !Array.isArray(batch) || batch.length === 0) {
       return res.status(400).json({ error: "❌ Invalid batch data" });
-    }
-  
-    try {
+  }
+
+  try {
       const batchData = await Promise.all(
-        batch.map(async (item) => {
-          const unit_id = await InventoryModel.getUnitId(item.unit);
-          if (!unit_id) throw new Error("❌ Invalid unit");
-  
-          let finalExpirationDate = item.expiration_date;
-  
-          // ✅ คำนวณวันหมดอายุถ้าไม่มีการระบุ
-          if (!finalExpirationDate) {
-            const [shelfLifeRow] = await db.query(
-              `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
-              [item.category_id]
-            );
-            if (shelfLifeRow.length > 0) {
-              finalExpirationDate = new Date(item.received_date);
-              finalExpirationDate.setDate(finalExpirationDate.getDate() + shelfLifeRow[0].shelf_life_days);
-            } else {
-              throw new Error("❌ Shelf life not found for this category");
-            }
-          }
-  
-          return {
-            name: item.name,
-            category_id: item.category_id,
-            quantity: item.quantity,
-            received_date: item.received_date,
-            expiration_date: finalExpirationDate,
-            price: item.price,
-            unit_id: unit_id,
-          };
-        })
+          batch.map(async (item) => {
+              // ✅ ดึง unit_id จากชื่อหน่วย
+              const [unitRow] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [item.unit]);
+              if (!unitRow.length) {
+                  throw new Error(`❌ Unit '${item.unit}' not found`);
+              }
+              const unit_id = unitRow[0].unit_id; // ✅ กำหนดค่า unit_id
+
+              let finalExpirationDate = item.expiration_date;
+
+              // ✅ คำนวณวันหมดอายุถ้าไม่มีการระบุ
+              if (!finalExpirationDate) {
+                  const [shelfLifeRow] = await db.query(
+                      `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
+                      [item.category_id]
+                  );
+                  if (shelfLifeRow.length > 0) {
+                      finalExpirationDate = new Date(item.received_date);
+                      finalExpirationDate.setDate(finalExpirationDate.getDate() + shelfLifeRow[0].shelf_life_days);
+                  } else {
+                      throw new Error("❌ Shelf life not found for this category");
+                  }
+              }
+
+              return {
+                  name: item.name,
+                  category_id: item.category_id,
+                  quantity: item.quantity,
+                  received_date: item.received_date,
+                  expiration_date: finalExpirationDate,
+                  price: item.price,
+                  unit_id: unit_id, // ✅ กำหนด unit_id
+              };
+          })
       );
-  
+
       await InventoryModel.addBatch(batchData);
       res.status(201).json({ success: true, message: "✅ Batch added successfully" });
-    } catch (error) {
+  } catch (error) {
       console.error("❌ Error adding batch:", error);
       res.status(500).json({ error: "❌ Failed to add batch" });
-    }
-  };
+  }
+};
   
 // ✅ ลบวัตถุดิบ
 exports.deleteMaterial = async (req, res) => {
