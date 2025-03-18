@@ -181,12 +181,17 @@ const InventoryModel = {
   // ✅ ดึง unit_id จากชื่อหน่วย
   async getUnitId(unitName) {
     const [rows] = await db.query(
-      "SELECT unit_id FROM units WHERE unit_name = ?",
+      "SELECT unit_id FROM unit WHERE unit_name = ?",
       [unitName]
     );
-    return rows.length > 0 ? rows[0].unit_id : null;
+  
+    if (rows.length === 0) {
+      throw new Error(`❌ Unit '${unitName}' not found in database`);
+    }
+  
+    return rows[0].unit_id;
   },
-
+  
   // ✅ แสดงวัตถุดิบที่ใช้บ่อยที่สุด
   async getMostUsedMaterials() {
     const [rows] = await db.query(`
