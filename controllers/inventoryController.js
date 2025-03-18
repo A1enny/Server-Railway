@@ -49,58 +49,95 @@ exports.addMaterial = async (req, res) => {
       name, category_id, quantity, received_date, expiration_date, price, unit
     } = req.body;
   
-    if (!name || !category_id || !quantity || !received_date || !expiration_date || !price || !unit) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!name || !category_id || !quantity || !received_date || !price || !unit) {
+      return res.status(400).json({ error: "❌ Missing required fields" });
     }
   
     try {
-      const unit_id = await InventoryModel.getUnitId(unit);
-      if (!unit_id) {
-        return res.status(400).json({ error: "Invalid unit" });
+      const getUnitId = async (unitName) => {
+        const [rows] = await db.query("SELECT unit_id FROM unit WHERE unit_name = ?", [unitName]);
+        return rows.length ? rows[0].unit_id : null;
+      };
+      
+  
+      let finalExpirationDate = expiration_date;
+  
+      // ✅ ถ้าไม่ได้ระบุวันหมดอายุ ให้คำนวณจาก shelf_life
+      if (!expiration_date) {
+        const [shelfLifeRow] = await db.query(
+          `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
+          [category_id]
+        );
+        if (shelfLifeRow.length > 0) {
+          finalExpirationDate = new Date(received_date);
+          finalExpirationDate.setDate(finalExpirationDate.getDate() + shelfLifeRow[0].shelf_life_days);
+        } else {
+          return res.status(400).json({ error: "❌ Shelf life not found for this category" });
+        }
       }
   
       const result = await InventoryModel.addMaterial({
-        name, category_id, quantity, received_date, expiration_date, price, unit_id
+        name, category_id, quantity, received_date, expiration_date: finalExpirationDate, price, unit_id
       });
   
       res.status(201).json({ success: true, material_id: result.insertId });
     } catch (error) {
       console.error("❌ Error adding material:", error);
-      res.status(500).json({ error: "Failed to add material" });
+      res.status(500).json({ error: "❌ Failed to add material" });
     }
-  };  
+  };
+    
 
 // ✅ เพิ่มวัตถุดิบแบบล็อต (batch)
 exports.addBatch = async (req, res) => {
-  const { batch } = req.body;
-  if (!batch || !Array.isArray(batch) || batch.length === 0) {
-    return res.status(400).json({ error: "Invalid batch data" });
-  }
-  try {
-    const batchData = await Promise.all(
-      batch.map(async (item) => {
-        const unit_id = await InventoryModel.getUnitId(item.unit);
-        if (!unit_id) throw new Error("Invalid unit");
-        return {
-          name: item.name,
-          category_id: item.category,
-          quantity: item.quantity,
-          received_date: item.received_date,
-          expiration_date: item.expiration_date,
-          price: item.price,
-          unit_id: unit_id,
-        };
-      })
-    );
-    await InventoryModel.addBatch(batchData);
-    res
-      .status(201)
-      .json({ success: true, message: "Batch added successfully" });
-  } catch (error) {
-    res.status(500).json({ error: "Failed to add batch" });
-  }
-};
-
+    const { batch } = req.body;
+    
+    if (!batch || !Array.isArray(batch) || batch.length === 0) {
+      return res.status(400).json({ error: "❌ Invalid batch data" });
+    }
+  
+    try {
+      const batchData = await Promise.all(
+        batch.map(async (item) => {
+          const unit_id = await InventoryModel.getUnitId(item.unit);
+          if (!unit_id) throw new Error("❌ Invalid unit");
+  
+          let finalExpirationDate = item.expiration_date;
+  
+          // ✅ คำนวณวันหมดอายุถ้าไม่มีการระบุ
+          if (!finalExpirationDate) {
+            const [shelfLifeRow] = await db.query(
+              `SELECT shelf_life_days FROM shelf_life WHERE category_id = ?`,
+              [item.category_id]
+            );
+            if (shelfLifeRow.length > 0) {
+              finalExpirationDate = new Date(item.received_date);
+              finalExpirationDate.setDate(finalExpirationDate.getDate() + shelfLifeRow[0].shelf_life_days);
+            } else {
+              throw new Error("❌ Shelf life not found for this category");
+            }
+          }
+  
+          return {
+            name: item.name,
+            category_id: item.category_id,
+            quantity: item.quantity,
+            received_date: item.received_date,
+            expiration_date: finalExpirationDate,
+            price: item.price,
+            unit_id: unit_id,
+          };
+        })
+      );
+  
+      await InventoryModel.addBatch(batchData);
+      res.status(201).json({ success: true, message: "✅ Batch added successfully" });
+    } catch (error) {
+      console.error("❌ Error adding batch:", error);
+      res.status(500).json({ error: "❌ Failed to add batch" });
+    }
+  };
+  
 // ✅ ลบวัตถุดิบ
 exports.deleteMaterial = async (req, res) => {
   try {
