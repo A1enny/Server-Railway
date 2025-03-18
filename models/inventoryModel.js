@@ -2,13 +2,15 @@ const db = require("../config/db");
 
 const InventoryModel = {
   // ✅ ดึงข้อมูลวัตถุดิบพร้อมค้นหา และกรองตามหมวดหมู่
-  async getMaterials({ search = "%", category = "%", limit = 10, offset = 0 }) {
+  async getMaterials({ search = "%", category = null, limit = 10, offset = 0 }) {
     try {
       console.log("🔍 Fetching materials with batches...");
 
+      const searchValue = `%${search}%`;  // ✅ แก้ให้ LIKE ใช้ค่า `%`
+
       const [[{ total }]] = await db.query(
-        `SELECT COUNT(*) AS total FROM materials WHERE name LIKE ? AND (category_id = ? OR ? = '%')`,
-        [search, category, category]
+        `SELECT COUNT(*) AS total FROM materials WHERE name LIKE ? AND (category_id = ? OR ? IS NULL)`,
+        [searchValue, category, category]
       );
 
       const [rows] = await db.query(
@@ -26,30 +28,30 @@ const InventoryModel = {
           ELSE 'ปกติ'
       END AS status,
       COALESCE(
-    JSON_ARRAYAGG(
-        JSON_OBJECT(
-            'batch_id', IFNULL(ib.batch_id, 0),
-            'batch_number', IFNULL(ib.batch_number, ''),
-            'received_date', IFNULL(ib.received_date, ''),
-            'expiration_date', IFNULL(ib.expiration_date, ''),
-            'quantity', IFNULL(ib.quantity, 0),
-            'price', IFNULL(ib.price, 0)
-        )
-    ),
-    '[]'
-) AS batches
+          JSON_ARRAYAGG(
+              JSON_OBJECT(
+                  'batch_id', IFNULL(ib.batch_id, 0),
+                  'batch_number', IFNULL(ib.batch_number, ''),
+                  'received_date', IFNULL(ib.received_date, ''),
+                  'expiration_date', IFNULL(ib.expiration_date, ''),
+                  'quantity', IFNULL(ib.quantity, 0),
+                  'price', IFNULL(ib.price, 0)
+              )
+          ),
+          '[]'
+      ) AS batches
   FROM materials m
   LEFT JOIN categories c ON m.category_id = c.category_id
   LEFT JOIN inventory_batches ib ON m.material_id = ib.material_id
   LEFT JOIN unit u ON m.unit_id = u.unit_id
-  WHERE m.name LIKE ?  -- ✅ ใช้ '?' ใน Prepared Statement
+  WHERE m.name LIKE ? AND (m.category_id = ? OR ? IS NULL)  -- ✅ ใช้ LIKE + ตรวจสอบ NULL
   GROUP BY m.material_id, m.name, c.category_name, u.unit_name, m.min_stock
   ORDER BY m.material_id ASC
-        LIMIT ? OFFSET ?;`,
-        [search, category, category, limit, offset]
+  LIMIT ? OFFSET ?;`,
+        [searchValue, category, category, limit, offset]
       );
 
-      // ✅ ตรวจสอบว่าค่า `batches` ที่ส่งมาจาก MySQL เป็น string หรือไม่
+      // ✅ ตรวจสอบว่า `batches` เป็น string หรือไม่
       rows.forEach((row) => {
         try {
           if (typeof row.batches === "string") {
@@ -70,6 +72,7 @@ const InventoryModel = {
       throw new Error("❌ ไม่สามารถดึงข้อมูลวัตถุดิบพร้อมล็อตได้");
     }
   },
+
 
   // ✅ ดึงข้อมูลวัตถุดิบตาม ID
   async getMaterialById(id) {
